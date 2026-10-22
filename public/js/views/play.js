@@ -10,7 +10,7 @@ import { suggestCheckout } from '/js/core/checkout.js';
 import { addGame } from '/js/core/storage.js';
 import { buildBoard } from '/js/board.js';
 import { el, icon, toast, uid } from '/js/util.js';
-import { callDart, callVisitEnd, callGameShot, callDoubleRequired, callBigFish, clearQueue, preloadForRest } from '/js/caller-voice.js';
+import { callDart, callVisitEnd, callGameShot, callDoubleRequired, callBigFish, clearQueue, preloadForRest, unlockAudio, warmAudioPool } from '/js/caller-voice.js';
 import { padThrow, padSpecial, pushSnapshot, popSnapshot, checkoutLine, HAPTIC } from '/js/core/pad.js';
 import { activePlayer, store, rerender } from '/js/app.js';
 import { cricketMarksTable } from '/js/views/cricket-ui.js';
@@ -92,6 +92,12 @@ function renderSetup(view) {
       store.state.settings.lastMode = sel.mode;
       store.save();
       window.__DARTPRO_SESSION_ACTIVE = true;
+      // iOS-PWA: Audio-Element-Pool JETZT (in der User-Geste) vorbereiten, damit
+      // mitten im Spiel kein Element mehr erzeugt/entsperrt werden muss -> keine
+      // abgeschnittenen Clips, Reihenfolge 100%.
+      unlockAudio();
+      warmAudioPool(6);
+      if (sel.mode === 'x01') preloadForRest(sel.start);
       rerender();
     }
   }, icon('i-plus'), 'Spiel starten');

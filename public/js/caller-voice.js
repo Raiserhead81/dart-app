@@ -1,34 +1,53 @@
-// Caller-Stimme: echte Audio-Clips von /caller/<set>/<lang>/ (ElevenLabs, edge) mit
-// Web-Speech-Fallback. Serielle Queue MIT sauberen Pausen (Kays Timing), Applaus bei
-// Game Shot / Match. Preload + iOS-Unlock bei erster Interaktion.
+// Caller-Stimme: echte Audio-Clips von /caller/<set>/<lang>/ (ElevenLabs, Gemini, edge)
+// oder Web-Speech als EXPLIZITES Set ("Gerätstimme"). Strikt serielle Queue: genau EIN
+// Audio-Element spielt jezeit, der nächste Clip startet erst nach 'ended' + Gap-Wert.
+//
+// Kein Auto-Fallback mehr (Kays Ton-Bug): Fehlt ein Clip im gewählten Set -> STILLE.
+// Bisher fiel fehlende rest-171..501-Clips mitten in der Sequenz auf speechSynthesis
+// (weibliche Gerätstimme) zurück = Stimmmix + Timing-Chaos. Web-Speech läuft nur noch,
+// wenn das Set "device" explizit gewählt ist.
+//
+// iOS-PWA: Audio-Element-Pool wird beim Spielstart vorab erstellt (warmAudioPool) und
+// bei der ersten User-Geste entsperrt (unlockAudio) — kein Element wird mehr mitten
+// in einer Sequenz neu erzeugt/entsperrt, Reihenfolge 100%.
 
 import { remainingCallerWords, checkoutCallWords, throwCallerWords, gameShotCallerWords } from '/js/core/caller.js';
 import { suggestCheckout } from '/js/core/checkout.js';
 import { visitSequence, endSequence } from '/js/core/caller-sequence.js';
 
-const audioCache = new Map();
-const missing = new Set();
+export const DEVICE_SET = 'device'; // Web-Speech — nur manuell wählbar, nie Auto-Mix
+
+const audioCache = new Map();   // url -> Audio-Element (wird wiederverwendet)
+const missing = new Set();      // URLs, die es im Set nicht gibt -> Stille
+const sparePool = [];           // vorgebaute, entsperrende Elemente (iOS)
 let queue = [];
 let playing = false;
+let drainWaiters = [];
 
 let settings = { enabled: true, checkout: true, dartCalls: true, lang: 'en', rate: 1.0, voiceURI: null, voiceSet: 'elevenlabs', applause: true };
 
-export function configureCaller(s) { settings = { ...settings, ...s }; }
+export function configureCaller(s) { settings = { ...settings, ...s }; if (!settings.voiceSet) settings.voiceSet = 'elevenlabs'; }
 export function callerSettings() { return settings; }
 
-// Stimm-Sets: Verzeichnisse unter /caller/<set>/<lang>/. Manifest liefert die Auswahl.
+// Stimm-Sets: Verzeichnisse unter /caller/<set>/<lang>/. Manifest liefert die Auswahl;
+// "Gerätstimme" wird als eigenes Set ans Ende gehängt.
 let manifest = null;
 export async function loadCallerManifest() {
-  if (manifest) return manifest;
-  try {
-    const res = await fetch('/caller/manifest.json', { cache: 'no-store' });
-    if (res.ok) manifest = await res.json();
-  } catch (e) { /* offline */ }
-  return manifest || { sets: [{ id: 'edge', label: 'Caller (Standard)', provider: 'edge', full: true }] };
+  if (!manifest) {
+    try {
+      const res = await fetch('/caller/manifest.json', { cache: 'no-store' });
+      if (res.ok) manifest = await res.json();
+    } catch (e) { /* offline */ }
+    manifest = manifest || { sets: [{ id: 'edge', label: 'Caller (Standard)', provider: 'edge', full: true }] };
+    if (!manifest.sets.some(s => s.id === DEVICE_SET)) {
+      manifest.sets.push({ id: DEVICE_SET, label: 'Gerätstimme', provider: 'device', full: true });
+    }
+  }
+  return manifest;
 }
 
 function clipUrlFor(set, kind, a, b) {
-  if (!set) return null;
+  if (!set || set === DEVICE_SET) return null;
   const lang = settings.lang === 'de' ? 'de' : 'en';
   switch (kind) {
     case 'rest': return `/caller/${set}/${lang}/rest-${a}.mp3`;
@@ -55,53 +74,97 @@ function clipCandidatesForId(clipId) {
   return [];
 }
 
+// GENAU EIN Kandidat je Clip: das gewählte Set. Kein Set-übergreifender Stimm-Mix.
 function clipCandidates(kind, a, b) {
-  const out = [];
-  const set = settings.voiceSet || 'elevenlabs';
-  if (set !== 'edge') out.push(clipUrlFor(set, kind, a, b));
-  out.push(clipUrlFor('edge', kind, a, b));
-  return out.filter(Boolean);
+  return [clipUrlFor(settings.voiceSet || 'elevenlabs', kind, a, b)].filter(Boolean);
 }
 const clipUrl = (kind, a, b) => clipCandidates(kind, a, b)[0];
 
-function getAudio(url) {
+// ---------- Audio-Elemente: Pool statt "new Audio" mitten im Spiel ----------
+const CACHE_MAX = 120;
+
+function newAudioElement() {
+  const a = new Audio();
+  a.preload = 'auto';
+  return a;
+}
+
+function acquireAudio(url) {
   if (missing.has(url)) return null;
   let a = audioCache.get(url);
-  if (!a) {
-    a = new Audio(url);
-    a.preload = 'auto';
-    a.addEventListener('error', () => missing.add(url));
-    audioCache.set(url, a);
-    if (audioCache.size > 90) {
-      const first = audioCache.keys().next().value;
-      const old = audioCache.get(first);
-      old.pause(); old.src = '';
-      audioCache.delete(first);
-    }
+  if (a) return a;
+  a = sparePool.pop() || newAudioElement(); // Pool-Element = auf iOS schon entsperrt
+  if (!a.__errBound) {
+    a.__errBound = true;
+    a.addEventListener('error', () => { if (a.__loadedUrl) missing.add(a.__loadedUrl); });
   }
+  audioCache.set(url, a);
+  evictCache();
   return a;
+}
+
+// URL an ein Element binden (nur bei Wechsel — kein Reload bei Wiederverwendung)
+function attachUrl(a, url) {
+  if (a.__loadedUrl === url) return false;
+  a.__loadedUrl = url;
+  try { a.src = url; } catch (e) { /* egal */ }
+  return true;
+}
+
+// Cache klein halten — aber NIE ein Element verdraengen, das gerade spielt
+function evictCache() {
+  if (audioCache.size <= CACHE_MAX) return;
+  for (const [u, el] of audioCache) {
+    if (audioCache.size <= CACHE_MAX) break;
+    if (!el.paused) continue;
+    audioCache.delete(u);
+    sparePool.push(el);
+  }
 }
 
 export function preloadClips(urls) {
   for (const u of urls) {
     if (!u || missing.has(u)) continue;
-    const a = getAudio(u);
-    if (a) { try { a.load(); } catch (e) { /* egal */ } }
+    const a = acquireAudio(u);
+    if (!a) continue;
+    attachUrl(a, u);
+    try { a.load(); } catch (e) { /* egal */ }
   }
 }
 
 export function preloadForRest(rest) {
-  if (rest < 2 || rest > 170) return;
-  const urls = [clipUrl('rest', rest), clipUrl('checkout', rest)];
+  if (rest < 2 || rest > 501) return;
+  const urls = [clipUrl('rest', rest)];
+  if (rest <= 170) urls.push(clipUrl('checkout', rest));
   preloadClips(urls);
 }
+
+// iOS-PWA: Pool beim Spielstart vorab erstellen (noch ohne Entsperrung).
+export function warmAudioPool(n = 6) {
+  if (typeof Audio === 'undefined') return 0;
+  let created = 0;
+  while (sparePool.length < n) { sparePool.push(newAudioElement()); created++; }
+  return created;
+}
+
+const SILENCE_WAV = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
 
 let unlocked = false;
 export function unlockAudio() {
   if (unlocked) return;
   unlocked = true;
+  warmAudioPool();
+  // Pool-Elemente in der User-Geste entsperren (iOS-Regel: play() nur im Gesture-Context)
+  for (const a of sparePool) {
+    try {
+      if (!a.src) a.src = SILENCE_WAV;
+      a.volume = 0;
+      const p = a.play();
+      if (p && p.catch) p.catch(() => { /* Headless/autoplay-Politik: egal */ });
+    } catch (e) { /* egal */ }
+  }
   try {
-    if ('speechSynthesis' in window) {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       const u = new SpeechSynthesisUtterance(' ');
       u.volume = 0;
       speechSynthesis.speak(u);
@@ -112,9 +175,10 @@ if (typeof document !== 'undefined') {
   document.addEventListener('pointerdown', unlockAudio, { once: true, capture: true });
 }
 
+// ---------- Web-Speech: NUR für das explizite "Gerätstimme"-Set ----------
 let voices = [];
 function loadVoices() {
-  if (!('speechSynthesis' in window)) return [];
+  if (typeof window === 'undefined' || !('speechSynthesis' in window)) return [];
   voices = speechSynthesis.getVoices();
   return voices;
 }
@@ -123,7 +187,7 @@ if (typeof speechSynthesis !== 'undefined') {
   speechSynthesis.onvoiceschanged = loadVoices;
 }
 function speakFallback(text) {
-  if (!('speechSynthesis' in window) || !text) return Promise.resolve();
+  if (typeof window === 'undefined' || !('speechSynthesis' in window) || !text) return Promise.resolve();
   return new Promise(resolve => {
     const u = new SpeechSynthesisUtterance(text);
     u.lang = settings.lang === 'de' ? 'de-DE' : 'en-GB';
@@ -141,7 +205,7 @@ function speakFallback(text) {
   });
 }
 
-// ---------- Queue (seriell mit Pausen) ----------
+// ---------- Queue (STRIKT seriell: ein Satz, dann Gap, dann der nächste) ----------
 function enqueue(items) {
   if (!settings.enabled) return;
   queue.push(...items);
@@ -149,13 +213,11 @@ function enqueue(items) {
 }
 export function clearQueue() {
   queue = [];
-  if (playing) {
-    for (const a of audioCache.values()) { try { a.pause(); } catch (e) {} }
-    if ('speechSynthesis' in window) speechSynthesis.cancel();
-  }
+  for (const a of audioCache.values()) { try { a.pause(); } catch (e) {} }
+  if (typeof speechSynthesis !== 'undefined') { try { speechSynthesis.cancel(); } catch (e) {} }
   playing = false;
+  resolveIdle();
 }
-
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 async function drain() {
@@ -164,32 +226,50 @@ async function drain() {
     const item = queue.shift();
     if (!item) continue;
     if (item.gapBeforeMs) await sleep(item.gapBeforeMs);
-    const result = await playItem(item);
-    if (result === 'missing' && item.text) await speakFallback(item.text);
-    // 'blocked' (Headless/kein Audio-Backend): Clip existiert, Wiedergabe unmoeglich -> kein TTS
+    if (settings.voiceSet === DEVICE_SET) {
+      await speakFallback(item.text); // explizites Gerätstimme-Set
+      continue;
+    }
+    // Clip-Fallback-AUS: fehlt der Clip -> Stille. Kein speechSynthesis-Auto-Mix.
+    await playItem(item);
   }
   playing = false;
+  resolveIdle();
+}
+function resolveIdle() {
+  if (queue.length || playing) return;
+  const w = drainWaiters; drainWaiters = [];
+  for (const r of w) r();
+}
+// Für Tests/Smoke: resolved, sobald Queue leer und nichts mehr spielt.
+export function callerIdle() {
+  if (!playing && !queue.length) return Promise.resolve();
+  return new Promise(r => drainWaiters.push(r));
 }
 
 async function playItem(item) {
   const candidates = item.urls || (item.url ? [item.url] : []);
   for (const url of candidates) {
     if (!url || missing.has(url)) continue;
-    let available = true;
-    try {
-      const head = await fetch(url, { method: 'HEAD' });
-      if (head.status === 404) available = false;
-    } catch (e) { /* offline: Wiedergabe versuchen */ }
-    if (!available) { missing.add(url); continue; }
-    const a = getAudio(url);
+    const a = acquireAudio(url);
     if (!a) continue;
+    attachUrl(a, url);
+    try { a.load(); } catch (e) { /* egal */ }
     const r = await new Promise(resolve => {
       a.playbackRate = item.rate || settings.rate || 1;
       a.volume = item.volume != null ? item.volume : 1;
+      try { a.currentTime = 0; } catch (e) { /* egal */ }
       let fadeTimer = null;
-      const cleanup = () => { a.removeEventListener('ended', done); a.removeEventListener('error', err); if (fadeTimer) clearInterval(fadeTimer); a.volume = 1; };
-      const done = () => { cleanup(); resolve('ok'); };
-      const err = () => { cleanup(); resolve('missing'); };
+      let watchdog = null;
+      let finished = false;
+      const cleanup = () => {
+        a.removeEventListener('ended', done); a.removeEventListener('error', err);
+        if (fadeTimer) clearInterval(fadeTimer);
+        if (watchdog) clearTimeout(watchdog);
+      };
+      const finish = (v) => { if (finished) return; finished = true; cleanup(); resolve(v); };
+      const done = () => finish('ok');
+      const err = () => { missing.add(url); finish('missing'); };
       a.addEventListener('ended', done);
       a.addEventListener('error', err);
       a.play().then(() => {
@@ -198,19 +278,20 @@ async function playItem(item) {
           fadeTimer = setInterval(() => {
             const left = item.playMs - (Date.now() - t0);
             if (left <= 300) { a.volume = Math.max(0, (item.volume || 1) * left / 300); }
-            if (left <= 0) { clearInterval(fadeTimer); a.pause(); done(); }
+            if (left <= 0) { clearInterval(fadeTimer); a.pause(); finish('ok'); }
           }, 60);
         }
-      }).catch(() => { cleanup(); resolve('blocked'); });
+      }).catch(() => finish('blocked'));
+      // Sicherheitsnetz: falls 'ended' nie feuert (Stream-Falle), Queue nicht blockieren
+      watchdog = setTimeout(() => finish('ok'), 20000);
     });
     if (r === 'ok') return 'ok';
     if (r === 'blocked') return 'blocked';
-    missing.add(url);
   }
   return 'missing';
 }
 
-// ---------- Clip-IDs -> URLs + Fallback-Texte ----------
+// ---------- Clip-IDs -> URLs + Gerätstimme-Texte ----------
 function textForClipId(id) {
   let m;
   if ((m = id.match(/^rest-(\d+)$/))) return remainingCallerWords(+m[1], settings.lang);
@@ -305,7 +386,8 @@ export function callBust() {
 
 export function previewSet(setId) {
   unlockAudio();
-  enqueue([{ urls: [clipUrlFor(setId, 'phrase', 'gameshot'), clipUrlFor('edge', 'phrase', 'gameshot')].filter(Boolean), text: 'Game shot!' }]);
+  if (setId === DEVICE_SET) { speakFallback('Game shot!'); return; } // Preview direkt, ohne Queue
+  enqueue([{ urls: [clipUrlFor(setId, 'phrase', 'gameshot')].filter(Boolean), text: 'Game shot!' }]);
 }
 
 export function precacheList() {

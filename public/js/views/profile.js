@@ -77,7 +77,7 @@ export function renderProfile(view) {
   if ('speechSynthesis' in window) speechSynthesis.onvoiceschanged = fillVoices;
 
   const callerPanel = el('div', { class: 'panel' },
-    el('h2', {}, 'Caller', el('span', { class: 'sub' }, 'echte Clips vom Server, Fallback: Gerätestimme')),
+    el('h2', {}, 'Caller', el('span', { class: 'sub' }, 'echte Clips vom Server — fehlt ein Clip: Stille, kein Stimm-Mix')),
     tgl('enabled', 'Caller aktiv', 'Restscore nach jedem Wurfsatz (Kays Kernanforderung)'),
     tgl('checkout', 'Checkout-Ansage', '„Double twenty for the match" / Route ab Rest 170'),
     tgl('dartCalls', 'Wurfpunkte je Dart', '„Treble twenty", 180 mit Schmackes'),
@@ -91,7 +91,7 @@ export function renderProfile(view) {
           e.currentTarget.classList.add('on'); fillVoices();
         }
       }, l))),
-    el('label', { class: 'field' }, el('span', {}, 'Stimme (Fallback / Deutsch)'), voiceSelect),
+    el('label', { class: 'field' }, el('span', {}, 'Gerätstimme (nur bei Set „Gerätstimme")'), voiceSelect),
     el('label', { class: 'field' }, el('span', {}, `Tempo: ${caller.rate ?? 1}`),
       el('input', {
         type: 'number', step: '0.05', min: '0.8', max: '1.4', value: caller.rate ?? 1,
