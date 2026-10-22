@@ -5,7 +5,7 @@ const AVG_LEVELS = [
   { min: 80, label: 'Profi-Niveau', note: 'PDC-Tour-Bereich', next: null },
   { min: 60, label: 'Sehr gut', note: 'Verbandsliga-Niveau', next: 80 },
   { min: 40, label: 'Hobby', note: 'solides Club-Niveau', next: 60 },
-  { min: 0, label: 'Anfaenger', note: 'Basis steht', next: 40 }
+  { min: 0, label: 'Anfänger', note: 'Basis steht', next: 40 }
 ];
 
 export function avgToLevel(avg) {
@@ -13,15 +13,15 @@ export function avgToLevel(avg) {
   for (const l of AVG_LEVELS) {
     if (avg >= l.min) return { label: l.label, note: l.note, next: l.next, value: avg };
   }
-  return { label: 'Anfaenger', note: 'Basis steht', next: 40, value: avg };
+  return { label: 'Anfänger', note: 'Basis steht', next: 40, value: avg };
 }
 
 // Checkout-%-Ziele pro Level
 export function checkoutToLevel(pct) {
   if (pct == null) return { label: '—', next: 30 };
-  if (pct >= 50) return { label: 'Sehr gut', note: '50%+ heisst: Legs laufen dir zu', next: 60, value: pct };
+  if (pct >= 50) return { label: 'Sehr gut', note: '50%+ heißt: Legs laufen dir zu', next: 60, value: pct };
   if (pct >= 35) return { label: 'Gut', note: 'Liga-Niveau', next: 50, value: pct };
-  if (pct >= 25) return { label: 'OK', note: 'Ausbaufaehig', next: 35, value: pct };
+  if (pct >= 25) return { label: 'OK', note: 'Ausbaufähig', next: 35, value: pct };
   return { label: 'Schwach', note: 'hier liegen die meisten verlorenen Legs', next: 25, value: pct };
 }
 
@@ -38,7 +38,7 @@ export function doublesToLevel(pct) {
 export function t20ToLevel(pct) {
   if (pct == null) return { label: '—', next: 8 };
   if (pct >= 15) return { label: 'Sehr gut', note: 'Turnier-Niveau', next: 18, value: pct };
-  if (pct >= 12) return { label: 'Gut', note: 'ueber Club-Durchschnitt', next: 15, value: pct };
+  if (pct >= 12) return { label: 'Gut', note: 'über Club-Durchschnitt', next: 15, value: pct };
   if (pct >= 8) return { label: 'OK', note: 'solide Basis', next: 12, value: pct };
   return { label: 'Schwach', note: 'Scoring kostet Legs', next: 8, value: pct };
 }
@@ -59,7 +59,7 @@ const SESSION_LIBRARY = {
   doubles: {
     title: 'Doubles-Drill: D20/D19/D16',
     plan: [
-      '10 Aufwaerm-Darts auf D20',
+      '10 Aufwärm-Darts auf D20',
       '30 Darts auf D20/D19 im Wechsel: 12 Treffer = geschafft',
       '3 Runden Around-the-Clock auf Doubles (D1 bis D10)'
     ],
@@ -74,14 +74,14 @@ const SESSION_LIBRARY = {
       'Bob\'s 27 komplett spielen (21 Runden)'
     ],
     pass: '3 der 5 Reste geschafft',
-    world: '5/5 Reste, Bob\'s 27 ueber 60'
+    world: '5/5 Reste, Bob\'s 27 über 60'
   },
   scoring: {
     title: 'Scoring-Drill: T20-Block',
     plan: [
       '25 Darts auf T20: 8 Treffer = solide, 12 = stark',
       '25 Darts auf T19 (Block-Wechsel, wenn 20 zubleibt)',
-      '3 Visits aufs Ziel "100+": 2 von 3 Visits ueber 100'
+      '3 Visits aufs Ziel "100+": 2 von 3 Visits über 100'
     ],
     pass: '8/25 T20 im ersten Block',
     world: '14/25 T20'
@@ -98,12 +98,12 @@ const SESSION_LIBRARY = {
   first9: {
     title: 'Einstiegs-Drill',
     plan: [
-      '9 bewusste Darts auf T20/T19 als Warmup, 3 Durchgaenge',
+      '9 bewusste Darts auf T20/T19 als Warmup, 3 Durchgänge',
       '1 kurzes Leg gegen die Uhr: unter 21 Darts',
       'Around the Clock einmal komplett vor jedem Spiel'
     ],
     pass: 'First 9 im Testleg >= Average',
-    world: 'First 9 ueber Average'
+    world: 'First 9 über Average'
   }
 };
 

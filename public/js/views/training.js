@@ -15,12 +15,12 @@ import { avgToLevel, checkoutToLevel, doublesToLevel, t20ToLevel, first9Verdict,
 import { weeklyTrend } from '/js/core/weeks.js';
 
 const DESCRIPTIONS = {
-  atc: { rules: 'Alle Felder von 1 bis 20 und Bull, in Reihenfolge. Jeder Treffer schaltet weiter. Gezaehlt werden die Darts: unter 60 komplett ist solide, unter 45 stark.', trains: 'Grundgenauigkeit und Wurfroutine', goal: 'unter 60 Darts komplett' },
+  atc: { rules: 'Alle Felder von 1 bis 20 und Bull, in Reihenfolge. Jeder Treffer schaltet weiter. Gezählt werden die Darts: unter 60 komplett ist solide, unter 45 stark.', trains: 'Grundgenauigkeit und Wurfroutine', goal: 'unter 60 Darts komplett' },
   doublesAtc: { rules: 'ATC nur auf Doubles: D1 bis D20, dann Bull. Harte Variante: je Feld max. 3 Versuche.', trains: 'Doppel-Trefferquote unter Druck', goal: 'unter 80 Darts komplett' },
-  shanghai: { rules: 'Runden 1 bis 7, je 3 Darts auf die Runden-Zahl. Single zaehlt 1, Doppel 2, Triple 3 Punkte. S+D+T derselben Zahl in einer Runde = Shanghai = sofortiger Gesamtsieg. Maximal 63 Punkte.', trains: 'Zielfelder 1-7 gezielt treffen', goal: 'ueber 35 Punkte' },
+  shanghai: { rules: 'Runden 1 bis 7, je 3 Darts auf die Runden-Zahl. Single zählt 1, Doppel 2, Triple 3 Punkte. S+D+T derselben Zahl in einer Runde = Shanghai = sofortiger Gesamtsieg. Maximal 63 Punkte.', trains: 'Zielfelder 1-7 gezielt treffen', goal: 'über 35 Punkte' },
   bob27: { rules: "Start bei 27 Punkten. Je Runde 3 Darts auf D1 bis D20, dann Bull. Jeder Treffer bringt das Doppel (2 x Wert), alle 3 daneben kosten den doppelten Wert. Ende bei 0 oder nach 21 Runden.", trains: 'Doubles unter Punktdruck', goal: 'Score 50+ gut, 100+ Weltklasse' },
-  t20: { rules: '25 Darts auf Triple 20. Nur T20 zaehlt als Hit, andere 20er zaehlen Punkte aber keinen Hit.', trains: 'Scoring-Power auf das wichtigste Feld', goal: '8/25 solide, 12/25 stark, 15/25 Turnier' },
-  checkout: { rules: '14 klassische Reste (32 bis 170). Die Route wird angezeigt — wirf sie Darts fuer Darts nach. Falsches Segment zaehlt als Fehler.', trains: 'Checkout-Routen aus dem Kopf, sauber ausspielen', goal: '10/14 Reste, max. 20 Fehler' }
+  t20: { rules: '25 Darts auf Triple 20. Nur T20 zählt als Hit, andere 20er zaehlen Punkte aber keinen Hit.', trains: 'Scoring-Power auf das wichtigste Feld', goal: '8/25 solide, 12/25 stark, 15/25 Turnier' },
+  checkout: { rules: '14 klassische Reste (32 bis 170). Die Route wird angezeigt — wirf sie Darts für Darts nach. Falsches Segment zählt als Fehler.', trains: 'Checkout-Routen aus dem Kopf, sauber ausspielen', goal: '10/14 Reste, max. 20 Fehler' }
 };
 
 const TECHNIK = [

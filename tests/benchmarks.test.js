@@ -3,7 +3,7 @@ import { avgToLevel, checkoutToLevel, doublesToLevel, t20ToLevel, first9Verdict,
 
 describe('Benchmark-Einstufung', () => {
   it('3-Dart-Avg-Level', () => {
-    expect(avgToLevel(35).label).toBe('Anfaenger');
+    expect(avgToLevel(35).label).toBe('Anfänger');
     expect(avgToLevel(45).label).toBe('Hobby');
     expect(avgToLevel(65).label).toBe('Sehr gut');
     expect(avgToLevel(85).label).toBe('Profi-Niveau');
