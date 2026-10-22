@@ -171,10 +171,13 @@ export function renderProfile(view) {
   );
 
   // ----- App / Update -----
+  // Download als echter <a href target=_blank> (Custom-Tab/Gmail-sicher) mit VERSION
+  // als Cache-Buster im Query — kein fetch/Blob.
+  const apkLink = el('a', { class: 'btn', href: '/download/dart-app.apk?v=' + Date.now(), target: '_blank', rel: 'noopener' }, icon('i-download'), 'Android-App laden (APK)');
   const appPanel = el('div', { class: 'panel' },
     el('h2', {}, 'App'),
     el('div', { class: 'row' },
-      el('a', { class: 'btn', href: '/download/dart-app.apk' }, icon('i-download'), 'Android-App laden (APK)'),
+      apkLink,
       el('button', { class: 'btn ghost', onclick: startManualUpdateCheck }, 'Nach Update suchen'),
       el('span', { class: 'mono', id: 'appversion' }, '')
     ),
@@ -183,6 +186,7 @@ export function renderProfile(view) {
   fetch('/VERSION', { cache: 'no-store' }).then(r => r.text()).then(v => {
     const n = view.querySelector('#appversion');
     if (n) n.textContent = 'Version ' + v.trim();
+    apkLink.href = '/download/dart-app.apk?v=' + encodeURIComponent(v.trim());
   }).catch(() => {});
 
   view.append(
