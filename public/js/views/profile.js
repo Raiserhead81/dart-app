@@ -81,6 +81,7 @@ export function renderProfile(view) {
     tgl('enabled', 'Caller aktiv', 'Restscore nach jedem Wurfsatz (Kays Kernanforderung)'),
     tgl('checkout', 'Checkout-Ansage', '„Double twenty for the match" / Route ab Rest 170'),
     tgl('dartCalls', 'Wurfpunkte je Dart', '„Treble twenty", 180 mit Schmackes'),
+    tgl('applause', 'Applaus bei Game Shot', 'Publikums-Beifall wie im TV (Mixkit CC0)'),
     el('div', { id: 'voicesets' }, el('p', { class: 'muted small' }, 'Stimm-Sets werden geladen…')),
     el('div', { class: 'row', style: 'margin:10px 0' },
       [['en', 'Englisch'], ['de', 'Deutsch']].map(([v, l]) => el('button', {

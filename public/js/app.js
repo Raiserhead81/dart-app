@@ -60,6 +60,13 @@ export function rerender() {
   window.scrollTo({ top: 0 });
 }
 
+// Boot-Hint entfernen, sobald die App das erste Mal gerendert hat
+rerender();
+const bootHint = document.getElementById('boot-hint');
+if (bootHint) bootHint.remove();
+const bootCss = document.getElementById('bootcss');
+if (bootCss) bootCss.remove();
+
 window.addEventListener('hashchange', rerender);
 
 // Speichern bei Verlassen warnen, solange ein Spiel laeuft (verhindert versehentliches Swipe-Close)

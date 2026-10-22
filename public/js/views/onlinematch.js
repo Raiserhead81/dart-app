@@ -6,7 +6,7 @@ import { buildBoard } from '/js/board.js';
 import { el, icon, toast } from '/js/util.js';
 import { parseThrowInput, makeThrow } from '/js/core/segments.js';
 import { suggestCheckout } from '/js/core/checkout.js';
-import { callThrow, callVisitEnd, callGameShot, callBust, clearQueue, preloadForRest } from '/js/caller-voice.js';
+import { callDart, callVisitEnd, callGameShot, callBust, clearQueue, preloadForRest } from '/js/caller-voice.js';
 import { store, rerender } from '/js/app.js';
 
 const POLL_MS = 1500;
@@ -42,7 +42,7 @@ export function renderOnlineMatch(view, matchId) {
     try {
       const res = await api.throwDart(matchId, { dart: t });
       if (res.error) return toast(res.error);
-      if (boardSeg) callThrow({ k: t.k, n: t.n, v: t.v });
+      if (boardSeg) callDart({ k: t.k, n: t.n, v: t.v });
       if (res.event?.type === 'bust') callBust();
       if (res.event?.type === 'turn' || res.event?.type === 'bust') callVisitEnd(restBefore, { forMatch });
       if (res.event?.type === 'leg') callGameShot(res.legsWonMe, res.legsWonOpp, false);

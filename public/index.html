@@ -14,8 +14,19 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="DartPro">
 <link rel="stylesheet" href="/css/app.css">
+<style id="bootcss">
+  /* Kritisches CSS inline — Kaltstart ohne weissen Flash. Wird nach dem ersten
+     Rendern von app.js entfernt (damit Desktop-Regeln aus app.css greifen). */
+  :root { --bg:#070b09; --text:#f2f5ee; --line:#22301f; --nav-h:62px; }
+  html,body { margin:0; background:var(--bg); color:var(--text); font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; min-height:100dvh; }
+  .rail { position:fixed; bottom:0; left:0; right:0; z-index:40; display:flex; background:rgba(9,14,10,.92); border-top:1px solid var(--line); padding:6px 4px calc(6px + env(safe-area-inset-bottom)); }
+  .rail a { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; color:#93a396; text-decoration:none; font-size:10.5px; font-weight:800; text-transform:uppercase; padding:7px 2px; min-height:48px; justify-content:center; }
+  .view { padding:16px 12px calc(var(--nav-h) + 22px); max-width:1080px; margin:0 auto; }
+  .boot-hint { position:fixed; inset:auto 0 84px 0; text-align:center; color:#4d5b52; font-size:12px; letter-spacing:.1em; text-transform:uppercase; }
+</style>
 </head>
 <body>
+<div class="boot-hint" id="boot-hint">lädt…</div>
 <svg style="display:none" aria-hidden="true"><defs>
   <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="1.6" fill="currentColor"/></symbol>
   <symbol id="i-chart" viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
