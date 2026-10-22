@@ -1,0 +1,33 @@
+{
+  "slug": "dart-app",
+  "sso": "https://dart.gemivo.de/",
+  "shot": "/store/screenshots/dart-app.jpg",
+  "name": "DartPro",
+  "tagline": "Darts-Scoreboard mit echtem Caller: sieh Woche fuer Woche, was besser wird.",
+  "tagline_en": "Darts scoreboard with a real caller: see week by week what improves.",
+  "description": "DartPro macht Fortschritt sichtbar: X01 (101 bis 1001, Double Out/In) und Cricket mit TV-Caller-Stimme, Trefferbild-Heatmap und Kennzahlen pro Wurf (3-Dart-Average, First 9, Doppel- und Checkout-Quote, 100+/140+/180). Der Wochenverlauf zeigt 12 Wochen im Vergleich, die Analyse nennt deine 3 groessten Staerken und Schwaechen — und jeder Schwaeche liegt ein konkreter Trainings-Drill bei (Around the Clock, Bob's 27, 25 Darts auf T20, Checkout-Training). Dazu Online-Matches gegen Freunde, Freundes-Rangliste und Cloud-Sync. Kostenlos im Browser, installierbar als PWA und Android-APK, auf deutschen Servern.",
+  "description_en": "DartPro makes progress visible: X01 (101 to 1001, double out/in) and cricket with a TV-style caller voice, a hit heatmap and per-throw stats (3-dart average, first 9, doubles and checkout percentage, 100+/140+/180). The weekly trend compares 12 ISO weeks, the analysis names your 3 biggest strengths and weaknesses — and every weakness comes with a concrete training drill (around the clock, Bob's 27, 25 darts at T20, checkout practice). Plus online matches against friends, a friends ranking and cloud sync. Free in the browser, installable as a PWA and Android APK, hosted on German servers.",
+  "features": [
+    "X01 und Cricket mit echtem Caller: Restscore, Checkout-Ansage, Game Shot",
+    "Wochenverlauf (12 Wochen) mit Durchschnitt, Doppel- und Checkout-Quote",
+    "Staerken/Schwaechen-Analyse mit Trainings-Drills zum Direktstart",
+    "Online-Matches gegen Freunde und Freundes-Rangliste",
+    "Offline nutzbar: PWA fuer iOS/Android plus APK"
+  ],
+  "features_en": [
+    "X01 and cricket with a real caller: remaining score, checkout calls, game shot",
+    "12-week trend with average, doubles and checkout percentage",
+    "Strength/weakness analysis with one-tap training drills",
+    "Online matches against friends plus friends ranking",
+    "Works offline: PWA for iOS/Android plus APK"
+  ],
+  "category": "Spiele",
+  "status": "live",
+  "access": "public",
+  "url": "https://dart.gemivo.de",
+  "appurl": "https://dart.gemivo.de",
+  "pwa": true,
+  "apk": "https://dart.gemivo.de/download/dart-app.apk",
+  "value": "Jedes Leg gewertet: Avg, Doppel-Quote, Checkout — und eine Analyse, die sagt, was du diese Woche trainieren solltest.",
+  "value_en": "Every leg counted: average, doubles, checkout — plus an analysis telling you what to train this week."
+}
