@@ -8,23 +8,45 @@ const missing = new Set();      // urls, die 404 liefern
 let queue = [];
 let playing = false;
 
-let settings = { enabled: true, checkout: true, dartCalls: true, lang: 'en', rate: 1.0, voiceURI: null };
+let settings = { enabled: true, checkout: true, dartCalls: true, lang: 'en', rate: 1.0, voiceURI: null, voiceSet: 'elevenlabs' };
 
 export function configureCaller(s) { settings = { ...settings, ...s }; }
 export function callerSettings() { return settings; }
 
-function clipUrl(kind, a, b) {
+// Stimm-Sets: Verzeichnisse unter /caller/<set>/<lang>/. Manifest liefert die Auswahl.
+let manifest = null;
+export async function loadCallerManifest() {
+  if (manifest) return manifest;
+  try {
+    const res = await fetch('/caller/manifest.json', { cache: 'no-store' });
+    if (res.ok) manifest = await res.json();
+  } catch (e) { /* offline */ }
+  return manifest || { sets: [{ id: 'edge', label: 'Caller (Standard)', provider: 'edge', full: true }] };
+}
+
+function clipUrlFor(set, kind, a, b) {
+  if (!set) return null;
   const lang = settings.lang === 'de' ? 'de' : 'en';
   switch (kind) {
-    case 'rest': return `/caller/${lang}/rest-${a}.mp3`;
-    case 'checkout': return `/caller/${lang}/co-${a}.mp3`;
-    case 'double': return `/caller/${lang}/dx-${a}${b ? '-' + b : ''}.mp3`;
-    case 'score': return `/caller/${lang}/sc-${a}.mp3`;
-    case 'seg': return `/caller/${lang}/seg-${a}.mp3`;
-    case 'phrase': return `/caller/${lang}/ph-${a}.mp3`;
+    case 'rest': return `/caller/${set}/${lang}/rest-${a}.mp3`;
+    case 'checkout': return `/caller/${set}/${lang}/co-${a}.mp3`;
+    case 'double': return `/caller/${set}/${lang}/dx-${a}${b ? '-' + b : ''}.mp3`;
+    case 'score': return `/caller/${set}/${lang}/sc-${a}.mp3`;
+    case 'seg': return `/caller/${set}/${lang}/seg-${a}.mp3`;
+    case 'phrase': return `/caller/${set}/${lang}/ph-${a}.mp3`;
     default: return null;
   }
 }
+
+// Kandidaten-URLs: gewaehltes Set zuerst, dann edge-Fallback, dann Web Speech
+function clipCandidates(kind, a, b) {
+  const out = [];
+  const set = settings.voiceSet || 'elevenlabs';
+  if (set !== 'edge') out.push(clipUrlFor(set, kind, a, b));
+  out.push(clipUrlFor('edge', kind, a, b));
+  return out.filter(Boolean);
+}
+const clipUrl = (kind, a, b) => clipCandidates(kind, a, b)[0];
 
 function getAudio(url) {
   if (missing.has(url)) return null;
@@ -136,22 +158,26 @@ async function drain() {
   playing = false;
 }
 
-function playItem(item) {
-  return new Promise(resolve => {
-    if (item.url && !missing.has(item.url)) {
-      const a = getAudio(item.url);
-      if (a) {
-        a.playbackRate = item.rate || settings.rate || 1;
-        const done = () => { a.removeEventListener('ended', done); a.removeEventListener('error', err); resolve(true); };
-        const err = () => { a.removeEventListener('ended', done); a.removeEventListener('error', err); resolve(false); };
-        a.addEventListener('ended', done);
-        a.addEventListener('error', err);
-        a.play().catch(() => resolve(false));
-        return;
-      }
-    }
-    resolve(false); // Fallback: TTS mit text
-  });
+async function playItem(item) {
+  // item.urls: Kandidaten in Prioritaet (gewaehltes Set -> edge -> Web Speech)
+  const candidates = item.urls || (item.url ? [item.url] : []);
+  for (const url of candidates) {
+    if (!url || missing.has(url)) continue;
+    const a = getAudio(url);
+    if (!a) continue;
+    const ok = await new Promise(resolve => {
+      a.playbackRate = item.rate || settings.rate || 1;
+      const done = () => { cleanup(); resolve(true); };
+      const err = () => { cleanup(); resolve(false); };
+      const cleanup = () => { a.removeEventListener('ended', done); a.removeEventListener('error', err); };
+      a.addEventListener('ended', done);
+      a.addEventListener('error', err);
+      a.play().catch(() => { cleanup(); resolve(false); });
+    });
+    if (ok) return true;
+    missing.add(url);
+  }
+  return false;
 }
 
 const dNum = n => ({ code: 'D' + n, n });
@@ -162,30 +188,30 @@ const dCodeName = dcode => dcode.slice(1);
 export function callThrow(thr) {
   if (!settings.enabled || !settings.dartCalls) return;
   if (thr.k === 'sum') {
-    enqueue([{ url: clipUrl('score', thr.v), text: throwCallerWords(thr, settings.lang) }]);
+    enqueue([{ urls: clipCandidates('score', thr.v), text: throwCallerWords(thr, settings.lang) }]);
     return;
   }
   if (thr.v === 180) {
-    enqueue([{ url: clipUrl('phrase', '180'), text: 'One hundred and eighty!', rate: 1.08 }]);
+    enqueue([{ urls: clipCandidates('phrase', '180'), text: 'One hundred and eighty!', rate: 1.08 }]);
     return;
   }
   const segCode = thr.k === 'miss' ? 'miss' : thr.k === 'bull' ? 'bull' : thr.k === 'outer' ? '25' : (thr.k[0] + thr.n);
-  enqueue([{ url: clipUrl('seg', segCode), text: throwCallerWords(thr, settings.lang) }]);
+  enqueue([{ urls: clipCandidates('seg', segCode), text: throwCallerWords(thr, settings.lang) }]);
 }
 
 // Nach dem Wurfsatz: Restscore (immer) + Checkout-Weg (optional)
 export function callVisitEnd(rest, { forMatch = false } = {}) {
   if (!settings.enabled) return;
-  const items = [{ url: clipUrl('rest', rest), text: remainingCallerWords(rest, settings.lang) }];
+  const items = [{ urls: clipCandidates('rest', rest), text: remainingCallerWords(rest, settings.lang) }];
   if (settings.checkout) {
     const co = checkoutCallWords(rest, settings.lang, forMatch ? 'match' : 'plain', true);
     if (co) {
       const isDouble = rest === 50 || (rest >= 2 && rest <= 40 && rest % 2 === 0);
       if (isDouble) {
         const d = rest === 50 ? 'Bull' : 'D' + (rest / 2);
-        items.push({ url: clipUrl('double', d, forMatch ? 'match' : null), text: co });
+        items.push({ urls: clipCandidates('double', d, forMatch ? 'match' : null), text: co });
       } else {
-        items.push({ url: clipUrl('checkout', rest), text: co });
+        items.push({ urls: clipCandidates('checkout', rest), text: co });
       }
     }
   }
@@ -197,18 +223,24 @@ export function callDoubleRequired(dNumber, forMatch = false) {
   if (!settings.enabled || !settings.checkout) return;
   const code = dNumber === 50 ? 'Bull' : 'D' + dNumber;
   const words = checkoutCallWords(dNumber === 50 ? 50 : dNumber * 2, settings.lang, forMatch ? 'match' : 'plain', false);
-  enqueue([{ url: clipUrl('double', code, forMatch ? 'match' : null), text: words || `Double ${dNumber}` }]);
+  enqueue([{ urls: clipCandidates('double', code, forMatch ? 'match' : null), text: words || `Double ${dNumber}` }]);
 }
 
 export function callGameShot(legsLeft = 0) {
   if (!settings.enabled) return;
   const key = legsLeft > 0 ? 'gameshot-' + Math.min(3, legsLeft) : 'gameshot';
-  enqueue([{ url: clipUrl('phrase', key), text: gameShotCallerWords(settings.lang, legsLeft) }]);
+  enqueue([{ urls: clipCandidates('phrase', key), text: gameShotCallerWords(settings.lang, legsLeft) }]);
 }
 
 export function callBust() {
   if (!settings.enabled || !settings.dartCalls) return;
-  enqueue([{ url: clipUrl('phrase', 'bust'), text: settings.lang === 'de' ? 'Kein Score!' : 'No score!' }]);
+  enqueue([{ urls: clipCandidates('phrase', 'bust'), text: settings.lang === 'de' ? 'Kein Score!' : 'No score!' }]);
+}
+
+// Vorschau eines Stimm-Sets (Einstellungen)
+export function previewSet(setId) {
+  unlockAudio();
+  enqueue([{ urls: [clipUrlFor(setId, 'phrase', 'gameshot'), clipUrlFor('edge', 'phrase', 'gameshot')].filter(Boolean), text: 'Game shot!' }]);
 }
 
 // Alle URLs fuer Service-Worker-Precache (haeufigste)

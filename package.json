@@ -11,6 +11,7 @@
     "deploy": "bash bin/deploy.sh"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "express": "^4.21.2"
   },
   "devDependencies": {

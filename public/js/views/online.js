@@ -125,9 +125,7 @@ async function renderFriends(view) {
           class: 'btn small primary', onclick: async () => {
             try {
               const m = await api.createMatch(f.userId, { start: 501, doubleOut: true, firstTo: 3 });
-              location.hash = '#/play';
-              store.state.session = { type: 'online', matchId: m.matchId, online: true };
-              store.save();
+              location.hash = '#/match/' + m.matchId;
               rerender();
             } catch (e) { toast(e.message || 'Fehler'); }
           }
@@ -178,9 +176,7 @@ async function renderMatches(view) {
           el('div', { class: 'sub num' }, `${m.start} DO · ${m.legsWonMe}:${m.legsWonOpp} · ${m.status === 'active' ? 'läuft – du bist ' + (m.myTurn ? 'am Zug' : 'nicht am Zug') : m.status}`)),
         m.status === 'active' ? el('button', {
           class: 'btn small primary', onclick: () => {
-            location.hash = '#/play';
-            store.state.session = { type: 'online', matchId: m.matchId, online: true };
-            store.save();
+            location.hash = '#/match/' + m.matchId;
             rerender();
           }
         }, 'Öffnen') : el('span', { class: 'chip small' }, m.status === 'finished' ? 'beendet' : m.status)

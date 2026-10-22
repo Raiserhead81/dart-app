@@ -9,7 +9,7 @@ const SHELL_FILES = [
   '/js/app.js', '/js/util.js', '/js/board.js', '/js/charts.js', '/js/update.js',
   '/js/update-manual.js', '/js/caller-voice.js', '/js/api.js', '/js/sync.js',
   '/js/views/play.js', '/js/views/training.js', '/js/views/stats.js', '/js/views/profile.js',
-  '/js/views/online.js', '/js/views/cricket-ui.js'
+  '/js/views/online.js', '/js/views/cricket-ui.js', '/js/views/onlinematch.js'
 ];
 
 self.addEventListener('install', (e) => {

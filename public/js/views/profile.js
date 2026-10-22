@@ -34,7 +34,7 @@ export function renderProfile(view) {
             }
           }
         }, 'Löschen') : ''
-      )) : el('p', { class: 'muted' }, 'Noch kein Profil – leg eins an.')),
+      )) : [el('p', { class: 'muted' }, 'Noch kein Profil – leg eins an.')]),
     )
   );
   const nameInput = el('input', { type: 'text', placeholder: 'Name', maxlength: 24, style: 'max-width:260px' });
@@ -81,6 +81,7 @@ export function renderProfile(view) {
     tgl('enabled', 'Caller aktiv', 'Restscore nach jedem Wurfsatz (Kays Kernanforderung)'),
     tgl('checkout', 'Checkout-Ansage', '„Double twenty for the match" / Route ab Rest 170'),
     tgl('dartCalls', 'Wurfpunkte je Dart', '„Treble twenty", 180 mit Schmackes'),
+    el('div', { id: 'voicesets' }, el('p', { class: 'muted small' }, 'Stimm-Sets werden geladen…')),
     el('div', { class: 'row', style: 'margin:10px 0' },
       [['en', 'Englisch'], ['de', 'Deutsch']].map(([v, l]) => el('button', {
         class: 'chip' + (caller.lang === v ? ' on' : ''), onclick: (e) => {
@@ -103,6 +104,38 @@ export function renderProfile(view) {
         }
       }, icon('i-mic'), 'Caller testen (Rest 170)'))
   );
+
+  // Stimm-Sets dynamisch aus Manifest
+  import('/js/caller-voice.js').then(async m => {
+    const mf = await m.loadCallerManifest();
+    const box = callerPanel.querySelector('#voicesets');
+    box.innerHTML = '';
+    box.append(el('div', { class: 'small', style: 'font-weight:800;color:#e8dfc8;margin:8px 0 6px' }, 'Stimme'));
+    const full = (mf.sets || []).filter(s => s.full !== false);
+    const previews = (mf.sets || []).filter(s => s.full === false);
+    for (const s of full) {
+      box.append(el('div', { class: 'row', style: 'justify-content:space-between;margin:4px 0' },
+        el('button', {
+          class: 'chip' + ((caller.voiceSet || 'elevenlabs') === s.id ? ' on' : ''),
+          onclick: (e) => {
+            caller.voiceSet = s.id; configureCaller(caller); store.save();
+            box.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+            e.currentTarget.classList.add('on');
+          }
+        }, s.label + (s.provider === 'elevenlabs' ? '  · Premium' : '')),
+        el('button', { class: 'btn small ghost', onclick: () => m.previewSet(s.id) }, 'Anhören')
+      ));
+    }
+    if (previews.length) {
+      box.append(el('div', { class: 'small muted', style: 'margin:10px 0 4px' }, 'Weitere Stimmen (Vorschau) — wenn eine gefällt: gen-caller.sh --voice-id'));
+      for (const s of previews) {
+        box.append(el('div', { class: 'row', style: 'justify-content:space-between;margin:2px 0' },
+          el('span', { class: 'chip small' }, s.label),
+          el('button', { class: 'btn small ghost', onclick: () => m.previewSet(s.id) }, 'Anhören')
+        ));
+      }
+    }
+  }).catch(() => {});
 
   // ----- Daten -----
   const fileInput = el('input', { type: 'file', accept: 'application/json', style: 'display:none' });

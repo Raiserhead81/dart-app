@@ -4,6 +4,7 @@ import { load, persist } from '/js/core/storage.js';
 import { configureCaller } from '/js/caller-voice.js';
 import { startUpdateWatcher } from '/js/update.js';
 import { renderPlay } from '/js/views/play.js';
+import { renderOnlineMatch } from '/js/views/onlinematch.js';
 import { renderTraining } from '/js/views/training.js';
 import { renderStats } from '/js/views/stats.js';
 import { renderProfile } from '/js/views/profile.js';
@@ -27,7 +28,8 @@ const routes = {
   training: renderTraining,
   stats: renderStats,
   online: renderOnline,
-  profile: renderProfile
+  profile: renderProfile,
+  match: renderOnlineMatch
 };
 
 function currentRoute() {
