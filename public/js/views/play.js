@@ -8,7 +8,7 @@ import { suggestCheckout, checkoutHint } from '/js/core/checkout.js';
 import { addGame } from '/js/core/storage.js';
 import { buildBoard } from '/js/board.js';
 import { el, icon, toast, uid } from '/js/util.js';
-import { callThrow, callVisitEnd, callGameShot, callBust, callDoubleRequired, clearQueue, preloadForRest, callerSettings } from '/js/caller-voice.js';
+import { callThrow, callVisitEnd, callGameShot, callBust, callDoubleRequired, call180, callVisitHigh, callBigFish, clearQueue, preloadForRest, callerSettings } from '/js/caller-voice.js';
 import { activePlayer, store, rerender, navigate } from '/js/app.js';
 import { cricketMarksTable } from '/js/views/cricket-ui.js';
 
@@ -240,13 +240,26 @@ function doThrow(session, t, { board = null, rerenderView } = {}) {
   if (isX01) {
     const playerIdx = st.current;
     const restBefore = st.leg.remaining[playerIdx];
+    const legVisitStartBefore = st.leg.visitStart;
     const dartsInVisit = st.leg.visit.length;
     const forMatch = st.legsWon[playerIdx] === st.firstTo - 1;
     const ev = applyDart(st, t);
     store.save();
 
-    if (board) callThrow({ k: t.k, n: t.n, v: ev.throw.v });
-    if (ev.type === 'bust') callBust();
+    const restAfter = st.leg.remaining[playerIdx];
+    const visitDartsNow = st.leg.visit.length;
+    const visitPoints = ev.type === 'bust' ? 0 : restBefore - restAfter;
+
+    if (ev.type === 'bust') {
+      callBust();
+    } else if (visitPoints === 180 && visitDartsNow === 3) {
+      call180(); // grosser Call statt drei Segment-Calls
+    } else if (visitPoints >= 100 && visitDartsNow === 3) {
+      callVisitHigh(visitPoints); // 100+/140+ euphorisch als Visit-Call
+    } else if (board) {
+      callThrow({ k: t.k, n: t.n, v: ev.throw.v });
+    }
+
     if (ev.type === 'ok') {
       // Zwischenruf: nach Dart 2 nur noch ein Doppel noetig
       const restNow = st.leg.remaining[st.current];
@@ -254,10 +267,13 @@ function doThrow(session, t, { board = null, rerenderView } = {}) {
       if (isSimpleDouble && st.leg.visit.length < 3 && dartsInVisit >= 1) callDoubleRequired(restNow === 50 ? 50 : restNow / 2, forMatch);
       preloadForRest(st.leg.remaining[st.current]);
     }
-    if (ev.type === 'turn' || ev.type === 'noin') callVisitEnd(st.leg.remaining[st.current], { forMatch });
-    if (ev.type === 'bust') callVisitEnd(st.leg.remaining[st.current], { forMatch });
-    if (ev.type === 'leg') callGameShot(st.firstTo - st.legsWon[playerIdx]);
-    if (ev.type === 'match') { callGameShot(0); finishSession(session, false, ev); return ev; }
+    if (ev.type === 'turn' || ev.type === 'noin' || ev.type === 'bust') callVisitEnd(st.leg.remaining[st.current], { forMatch });
+    if (ev.type === 'leg' || ev.type === 'match') {
+      if (legVisitStartBefore === 170) callBigFish();
+      const oppLegs = st.players.length > 1 ? Math.max(...st.legsWon.filter((_, i) => i !== playerIdx)) : 0;
+      callGameShot(st.legsWon[playerIdx], oppLegs, ev.type === 'match');
+    }
+    if (ev.type === 'match') { finishSession(session, false, ev); return ev; }
 
     if (rerenderView) rerenderView();
     return ev;

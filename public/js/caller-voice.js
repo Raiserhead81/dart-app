@@ -33,6 +33,7 @@ function clipUrlFor(set, kind, a, b) {
     case 'double': return `/caller/${set}/${lang}/dx-${a}${b ? '-' + b : ''}.mp3`;
     case 'score': return `/caller/${set}/${lang}/sc-${a}.mp3`;
     case 'seg': return `/caller/${set}/${lang}/seg-${a}.mp3`;
+    case 'visit': return `/caller/${set}/${lang}/visit-${a}.mp3`;
     case 'phrase': return `/caller/${set}/${lang}/ph-${a}.mp3`;
     default: return null;
   }
@@ -76,6 +77,7 @@ export function preloadClips(urls) {
 
 // Relevante Clips für einen Rest vorladen (Restscore + Checkout + Doppel-Enden)
 export function preloadForRest(rest) {
+  if (rest < 2 || rest > 170) return; // ausserhalb des Vokabulars kein Preload
   const urls = [clipUrl('rest', rest), clipUrl('checkout', rest)];
   if (rest % 2 === 0 && rest >= 2 && rest <= 40) {
     urls.push(clipUrl('double', 'D' + (rest / 2), 'match'), clipUrl('double', 'D' + (rest / 2), 'game'));
@@ -152,8 +154,9 @@ async function drain() {
   while (queue.length) {
     const item = queue.shift();
     if (!item) continue;
-    const played = await playItem(item);
-    if (!played && item.text) await speakFallback(item.text);
+    const result = await playItem(item);
+    if (result === 'missing' && item.text) await speakFallback(item.text);
+    // 'blocked' (Headless/ohne Audio-Backend): Clip existiert, nur Wiedergabe unmoeglich -> kein TTS
   }
   playing = false;
 }
@@ -163,21 +166,29 @@ async function playItem(item) {
   const candidates = item.urls || (item.url ? [item.url] : []);
   for (const url of candidates) {
     if (!url || missing.has(url)) continue;
+    // Verfuegbarkeit pruefen (404 -> naechster Kandidat), dann abspielen
+    let available = true;
+    try {
+      const head = await fetch(url, { method: 'HEAD' });
+      if (head.status === 404) available = false;
+    } catch (e) { /* offline: probiere Wiedergabe trotzdem */ }
+    if (!available) { missing.add(url); continue; }
     const a = getAudio(url);
     if (!a) continue;
-    const ok = await new Promise(resolve => {
+    const r = await new Promise(resolve => {
       a.playbackRate = item.rate || settings.rate || 1;
-      const done = () => { cleanup(); resolve(true); };
-      const err = () => { cleanup(); resolve(false); };
+      const done = () => { cleanup(); resolve('ok'); };
+      const err = () => { cleanup(); resolve('blocked'); };
       const cleanup = () => { a.removeEventListener('ended', done); a.removeEventListener('error', err); };
       a.addEventListener('ended', done);
       a.addEventListener('error', err);
-      a.play().catch(() => { cleanup(); resolve(false); });
+      a.play().catch(() => { cleanup(); resolve('blocked'); });
     });
-    if (ok) return true;
+    if (r === 'ok') return 'ok';
+    if (r === 'blocked') return 'blocked';
     missing.add(url);
   }
-  return false;
+  return 'missing';
 }
 
 const dNum = n => ({ code: 'D' + n, n });
@@ -199,23 +210,55 @@ export function callThrow(thr) {
   enqueue([{ urls: clipCandidates('seg', segCode), text: throwCallerWords(thr, settings.lang) }]);
 }
 
-// Nach dem Wurfsatz: Restscore (immer) + Checkout-Weg (optional)
+// Nach dem Wurfsatz: Restscore + Checkout-Weg. Bei Rest <= 40 (einfaches Doppel)
+// keine Dopplung: kurz die Zahl ("Forty") + "Double twenty for the match".
 export function callVisitEnd(rest, { forMatch = false } = {}) {
   if (!settings.enabled) return;
+  if (rest < 2 || rest > 170) return; // Clips existieren fuer 2..170, darueber kein Rest-Call
+  const isSimpleDouble = rest === 50 || (rest >= 2 && rest <= 40 && rest % 2 === 0);
+  if (isSimpleDouble && settings.checkout) {
+    const d = rest === 50 ? 'Bull' : 'D' + (rest / 2);
+    const suffix = forMatch ? 'match' : null;
+    enqueue([
+      { urls: clipCandidates('score', rest), text: remainingCallerWords(rest, settings.lang) },
+      { urls: clipCandidates('double', d, suffix), text: checkoutCallWords(rest, settings.lang, forMatch ? 'match' : 'plain', true) }
+    ]);
+    return;
+  }
   const items = [{ urls: clipCandidates('rest', rest), text: remainingCallerWords(rest, settings.lang) }];
   if (settings.checkout) {
     const co = checkoutCallWords(rest, settings.lang, forMatch ? 'match' : 'plain', true);
-    if (co) {
-      const isDouble = rest === 50 || (rest >= 2 && rest <= 40 && rest % 2 === 0);
-      if (isDouble) {
-        const d = rest === 50 ? 'Bull' : 'D' + (rest / 2);
-        items.push({ urls: clipCandidates('double', d, forMatch ? 'match' : null), text: co });
-      } else {
-        items.push({ urls: clipCandidates('checkout', rest), text: co });
-      }
-    }
+    if (co) items.push({ urls: clipCandidates('checkout', rest), text: co });
   }
   enqueue(items);
+}
+
+// Grosser 180-Call (Visit-Score, mit Nachdruck)
+export function call180() {
+  if (!settings.enabled) return;
+  enqueue([{ urls: clipCandidates('phrase', '180'), text: 'One hundred and eighty!', rate: 1.08 }]);
+}
+
+// HIGH-Moment: 100+-Visit-Score euphorisch ("ONE HUNDRED AND FORTY!!")
+export function callVisitHigh(points) {
+  if (!settings.enabled) return;
+  enqueue([{ urls: clipCandidates('visit', points), text: enWords(points) + '!!', rate: 1.05 }]);
+}
+
+// Big Fish: 170er-Bull-Finish
+export function callBigFish() {
+  if (!settings.enabled) return;
+  enqueue([{ urls: clipCandidates('phrase', 'bigfish'), text: 'Big fish!!' }]);
+}
+
+function enWords(n) {
+  const ONES = ['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];
+  const TENS = ['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];
+  n = Math.max(0, Math.floor(n));
+  if (n < 20) return ONES[n];
+  if (n < 100) { const t = Math.floor(n / 10), o = n % 10; return o ? TENS[t] + ' ' + ONES[o] : TENS[t]; }
+  const h = Math.floor(n / 100), r = n % 100;
+  return ONES[h] + ' hundred' + (r ? ' and ' + enWords(r) : '');
 }
 
 // Zwischenruf: nur noch ein Doppel noetig
@@ -226,10 +269,18 @@ export function callDoubleRequired(dNumber, forMatch = false) {
   enqueue([{ urls: clipCandidates('double', code, forMatch ? 'match' : null), text: words || `Double ${dNumber}` }]);
 }
 
-export function callGameShot(legsLeft = 0) {
+export function callGameShot(legsWonMe = 0, legsWonOpp = 0, matchOver = false) {
   if (!settings.enabled) return;
-  const key = legsLeft > 0 ? 'gameshot-' + Math.min(3, legsLeft) : 'gameshot';
-  enqueue([{ urls: clipCandidates('phrase', key), text: gameShotCallerWords(settings.lang, legsLeft) }]);
+  // Game Shot ist ein HIGH-Moment -> euphorische Variante
+  const items = [{ urls: clipCandidates('phrase', 'gameshot-high'), text: 'GAME SHOT!!' }];
+  if (matchOver) {
+    items.push({ urls: clipCandidates('phrase', 'match'), text: 'Game, set and match!!' });
+  } else {
+    const a = Math.min(3, Math.max(1, legsWonMe));
+    const b = Math.min(3, Math.max(0, legsWonOpp));
+    items.push({ urls: clipCandidates('phrase', `leg-${a}-${b}`), text: `${a}-${b}` });
+  }
+  enqueue(items);
 }
 
 export function callBust() {

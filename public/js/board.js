@@ -149,6 +149,5 @@ export function buildHeatmap(counts = {}, { size = 340 } = {}) {
     const t = mk('text', { x: x.toFixed(1), y: (y + 7).toFixed(1), 'text-anchor': 'middle', fill: COL.cream, 'font-size': 17, 'font-weight': 700 });
     t.textContent = number;
   });
-  svg.replaceWith(heat);
   return heat;
 }

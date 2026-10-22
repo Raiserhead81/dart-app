@@ -45,8 +45,8 @@ export function renderOnlineMatch(view, matchId) {
       if (boardSeg) callThrow({ k: t.k, n: t.n, v: t.v });
       if (res.event?.type === 'bust') callBust();
       if (res.event?.type === 'turn' || res.event?.type === 'bust') callVisitEnd(restBefore, { forMatch });
-      if (res.event?.type === 'leg') callGameShot(0);
-      if (res.event?.type === 'match') callGameShot(0);
+      if (res.event?.type === 'leg') callGameShot(res.legsWonMe, res.legsWonOpp, false);
+      if (res.event?.type === 'match') callGameShot(res.legsWonMe, res.legsWonOpp, true);
       render(res);
     } catch (e) {
       toast(e.message || 'Fehler');
