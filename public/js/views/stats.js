@@ -85,6 +85,26 @@ export function renderStats(view, arg) {
   );
   view.append(hero);
 
+  // ===== KAY-NEU: Letztes Match direkt unter dem Hero (nach Spielende nahtlos sichtbar) =====
+  const lastGame = games.filter(g => g.kind === 'x01' && (g.results || []).some(r => r.player === current)).slice(-1)[0];
+  if (lastGame) {
+    const r = lastGame.results.find(x => x.player === current);
+    const opp = (lastGame.results || []).find(x => x.player !== current);
+    const co = r.checkouts?.attempts ? Math.round(r.checkouts.hits / r.checkouts.attempts * 100) + '%' : '-';
+    view.append(el('div', { class: 'darkpanel', id: 'lastmatch' },
+      el('h2', {}, 'Letztes Match ', el('span', { class: 'sub' }, lastGame.label || 'X01',
+        opp ? el('span', { class: 'sub' }, ` · vs. ${opp.player} ${r.legsWon}-${opp.legsWon}`) : '')),
+      el('div', { class: 'herominis', style: 'margin-top:8px' },
+        ...[
+          ['Avg', fmt(r.avg3)],
+          ['Checkout', co],
+          ['Darts', String(r.darts)],
+          ['Legs', `${r.legsWon}/${r.legsPlayed}`]
+        ].map(([l, v]) => el('div', { class: 'heromini' }, el('div', { class: 'v' }, v), el('div', { class: 'l' }, l)))
+      )
+    ));
+  }
+
   // ===== Bestmarken-Feier: letzte aktive Woche schlägt alle 12 Wochen? =====
   const played = trend.filter(t => t.stats.darts > 0);
   if (played.length >= 2) {

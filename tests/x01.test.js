@@ -134,3 +134,50 @@ describe('x01 basics', () => {
     expect(s.visits[1].points).toBe(0);
   });
 });
+
+// KAY-NEU: Sets (Best of N) — Leg-Zaehler startet pro Set bei 0, Set-Gewinn = 'set'-Event
+describe('X01 Sets-Modus', () => {
+  function finishLegFast(s, p) {
+    // Solo-Leg per State-Injection abschliessen: remaining auf 40, dann D20
+    s.leg.remaining[p] = 40;
+    return applyDart(s, { k: 'double', n: 20, c: 'D20', v: 40 });
+  }
+
+  it('Best of 3 Sets, First to 1: Leg 1 gewinnt das SET (legs reset, setsWon 1-0)', () => {
+    const s = newX01({ start: 501, players: ['A'], firstTo: 1, setsTo: 3 });
+    const ev = finishLegFast(s, 0);
+    expect(ev.type).toBe('set');
+    expect(ev.sets).toEqual([1]);
+    expect(s.setsWon).toEqual([1]);
+    expect(s.legsWon).toEqual([0]); // neues Set: Legs bei 0
+    expect(s.finished).toBe(false);
+  });
+
+  it('Best of 3 Sets: zweites Set entscheidet das MATCH', () => {
+    const s = newX01({ start: 501, players: ['A'], firstTo: 1, setsTo: 3 });
+    finishLegFast(s, 0); // Set 1 -> 1-0
+    const ev2 = finishLegFast(s, 0); // Set 2 -> Match
+    expect(ev2.type).toBe('match');
+    expect(ev2.sets).toEqual([2]);
+    expect(s.finished).toBe(true);
+    expect(s.winner).toBe(0);
+  });
+
+  it('ohne SetsTo: Verhalten wie bisher (Leg entscheidet direkt das Match)', () => {
+    const s = newX01({ start: 501, players: ['A'], firstTo: 2 });
+    finishLegFast(s, 0);
+    expect(s.legsWon).toEqual([1]);
+    expect(s.finished).toBe(false); // firstTo 2: noch kein Match
+    const ev = finishLegFast(s, 0);
+    expect(ev.type).toBe('match');
+    expect(s.legsWon).toEqual([2]); // Legs akkumulieren weiter
+    expect(s.setsWon).toEqual([0]); // nie gesetzt
+  });
+
+  it('Verlust-Leg im Set-Modus resettet nicht (Sets bleiben)', () => {
+    const s = newX01({ start: 501, players: ['A'], firstTo: 1, setsTo: 3 });
+    finishLegFast(s, 0); // A gewinnt Set 1-0
+    expect(s.setsWon).toEqual([1]);
+    expect(s.leg.legNo).toBe(2);
+  });
+});

@@ -56,6 +56,7 @@ export function buildCallerSentences() {
   // High-/Euphorische Varianten: gen-euphoric.py (Server) nutzt eigene Schreibweise
   // ("GAME SHOT!!") mit mehr style — die Basis-Phrasen hier bleiben die ruhige Version.
   out['en/ph-gameshot'] = 'Game shot!';
+  out['en/ph-set'] = 'SET!';
   out['en/ph-gameshot-1'] = 'Game shot! One leg to play.';
   out['en/ph-gameshot-2'] = 'Game shot! Two legs to play.';
   out['en/ph-gameshot-3'] = 'Game shot! Three legs to play.';

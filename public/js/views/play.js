@@ -10,7 +10,7 @@ import { suggestCheckout } from '/js/core/checkout.js';
 import { addGame } from '/js/core/storage.js';
 import { buildBoard } from '/js/board.js';
 import { el, icon, toast, uid } from '/js/util.js';
-import { callDart, callVisitEnd, callGameShot, callDoubleRequired, callBigFish, clearQueue, flushPending, callerBusyMs, callerSettings, preloadForRest, unlockAudio, warmAudioPool } from '/js/caller-voice.js';
+import { callDart, callVisitEnd, callGameShot, callSetWon, callDoubleRequired, callBigFish, clearQueue, flushPending, callerBusyMs, callerSettings, preloadForRest, unlockAudio, warmAudioPool } from '/js/caller-voice.js';
 import { turnHoldMs } from '/js/core/turnhold.js';
 import { padThrow, padSpecial, pushSnapshot, popSnapshot, checkoutLine, HAPTIC } from '/js/core/pad.js';
 import { activePlayer, store, rerender } from '/js/app.js';
@@ -57,6 +57,17 @@ function renderSetup(view) {
     }
   }, `First to ${n}`));
 
+  // KAY-NEU: Sätze konfigurierbar — Best of N oder nur Legs (Default)
+  sel.setsTo = store.state.settings.lastSetsTo || 0;
+  const setChips = [0, 3, 5, 7].map(n => el('button', {
+    class: 'chip' + (sel.setsTo === n ? ' on' : ''), onclick: (e) => {
+      sel.setsTo = n;
+      store.state.settings.lastSetsTo = n;
+      setChips.forEach(c => c.classList.remove('on'));
+      e.currentTarget.classList.add('on');
+    }
+  }, n === 0 ? 'Keine Sets' : `Best of ${n} Sets`));
+
   const countChips = [1, 2, 3, 4].map(n => el('button', {
     class: 'chip num' + (n === 1 ? ' on' : ''), onclick: (e) => {
       sel.count = n;
@@ -84,7 +95,7 @@ function renderSetup(view) {
       const chosen = [...view.querySelectorAll('input[data-pi]')].map(inp => inp.value.trim()).filter(Boolean).slice(0, sel.count);
       if (!chosen.length) return toast('Mindestens ein Spielername');
       if (sel.mode === 'x01') {
-        const st = newX01({ start: sel.start, players: chosen, doubleOut: sel.doubleOut, doubleIn: sel.doubleIn, firstTo: sel.firstTo, id: uid() });
+        const st = newX01({ start: sel.start, players: chosen, doubleOut: sel.doubleOut, doubleIn: sel.doubleIn, firstTo: sel.firstTo, setsTo: sel.setsTo, id: uid() });
         store.state.session = { type: 'x01', state: st, snapshots: [], useBoard: sel.useBoard, date: new Date().toISOString() };
       } else {
         const st = newCricket({ players: chosen, cutThroat: sel.mode === 'cutthroat' });
@@ -111,7 +122,8 @@ function renderSetup(view) {
       el('div', { class: 'row' }, ...modeChips),
       x01opts,
       el('div', { class: 'row mt' }, ...startChips),
-      el('div', { class: 'row mt' }, ...ftChips)
+      el('div', { class: 'row mt' }, ...ftChips),
+      el('div', { class: 'row mt' }, ...setChips)
     ),
     el('div', { class: 'panel' },
       el('h2', {}, 'Spieler', el('span', { class: 'sub' }, '1 bis 4, lokal')),
@@ -135,7 +147,7 @@ function renderX01Game(view) {
   view.className = 'view view-game';
 
   const top = el('div', { class: 'gtop' },
-    el('span', { class: 'glabel' }, `X01 ${st.start} · ${st.doubleOut ? 'DO' : 'SO'} · Best of ${st.firstTo}`),
+    el('span', { class: 'glabel' }, `X01 ${st.start} · ${st.doubleOut ? 'DO' : 'SO'} · ${st.setsTo ? `Best of ${st.setsTo} Sets · First to ${st.firstTo}` : `Best of ${st.firstTo}`}`),
     el('span', { class: 'spacer' }),
     el('button', { class: 'gbtn', onclick: () => undo(session), title: 'Undo' }, icon('i-undo'), el('span', { class: 'hide-sm' }, 'Undo')),
     session.useBoard ? el('button', { class: 'gbtn', onclick: () => showBoardOverlay(session) }, icon('i-target'), el('span', { class: 'hide-sm' }, 'Scheibe')) : '',
@@ -228,15 +240,19 @@ function paintGame(view, session) {
     const color = PLAYER_COLORS[i % PLAYER_COLORS.length];
     const legBoxes = [];
     for (let l = 0; l < st.firstTo; l++) legBoxes.push(el('span', { class: 'legbox' + (l < st.legsWon[i] ? ' won' : '') }));
+    // KAY-NEU: Sets-Chips neben den Leg-Chips (nur im Sets-Modus)
+    const setChipsUi = st.setsTo ? [el('span', { class: 'setsbox' },
+      ...Array.from({ length: st.setsTo }, (_, s) => el('span', { class: 'legbox setbox' + (s < st.setsWon[i] ? ' won set' : ' set') }))) ] : [];
     const lastVisits = st.visits.filter(v => v.p === i);
     const lv = lastVisits[lastVisits.length - 1];
     const scored = Math.max(0, st.start - rest);
     cards.append(el('div', { class: 'scorecard' + (turn ? ' turn' : ' dim'), style: `--pc:${color}` },
-      el('div', { class: 'sc-head' }, el('span', { class: 'sc-name' }, p.name), el('span', { class: 'legboxes' }, ...legBoxes)),
+      el('div', { class: 'sc-head' }, el('span', { class: 'sc-name' }, p.name), el('span', { class: 'legboxes' }, ...setChipsUi, ...legBoxes)),
       el('div', { class: 'sc-rest num' }, String(rest)),
       el('div', { class: 'sc-progress' }, el('div', { class: 'sc-progress-fill', style: `width:${Math.min(100, scored / st.start * 100)}%` })),
       el('div', { class: 'sc-meta' },
         el('span', { class: 'sc-turn' }, turn ? 'AM ZUG' : ''),
+        st.setsTo ? el('span', { class: 'sets-score' }, `Sets ${st.setsWon[i]}`) : '',
         el('span', {}, avg != null ? 'Ø ' + String(avg).replace('.', ',') : ''),
         el('span', {}, lv != null ? `Last ${lv.points}` : `${darts} Darts`)
       )
@@ -248,7 +264,7 @@ function paintGame(view, session) {
   co.innerHTML = '';
   const rest = st.leg.remaining[st.current];
   if (!st.finished && st.doubleOut && rest <= 170 && rest >= 2) {
-    const forMatch = st.legsWon[st.current] === st.firstTo - 1;
+    const forMatch = matchPoint(st, st.current);
     const line = checkoutLine(rest, 3 - st.leg.visit.length, forMatch, suggestCheckout);
     if (line) {
       co.append(el('span', { class: 'co-label' }, 'CHECKOUT'), el('span', { class: 'co-route num' }, line));
@@ -266,6 +282,13 @@ function paintGame(view, session) {
 }
 
 /* ---- Wurf: sofort, Caller + Haptik + Gross-Momente ---- */
+// Match-Point (fuer "for the match"-Ansage): ohne Sets = Leg-Point zum Match;
+// mit Sets = nur wenn DIESER Leg-Gewinn auch das MATCH entscheidet.
+function matchPoint(st, p) {
+  if (st.setsTo) return st.setsWon[p] === Math.ceil(st.setsTo / 2) - 1 && st.legsWon[p] === st.firstTo - 1;
+  return st.legsWon[p] === st.firstTo - 1;
+}
+
 function doThrow(session, t, { rerenderView } = {}) {
   const st = session.state;
   pushSnapshot(session.snapshots, st);
@@ -279,7 +302,7 @@ function doThrow(session, t, { rerenderView } = {}) {
   const restBefore = st.leg.remaining[p];
   const legVisitStartBefore = st.leg.visitStart;
   const dartsInVisit = st.leg.visit.length;
-  const forMatch = st.legsWon[p] === st.firstTo - 1;
+  const forMatch = matchPoint(st, p);
   const ev = applyDart(st, t);
   store.save();
 
@@ -320,17 +343,33 @@ function doThrow(session, t, { rerenderView } = {}) {
     });
     session.visitLabels = [];
   }
+  if (ev.type === 'set') {
+    // KAY-NEU: Set-Gewinn — Animation + "Set!"-Ansage mit Setstand
+    buzz(HAPTIC.gameShot);
+    flashBig('SET!', 'gameshot', `${st.players[p].name} ${st.setsWon[0]}-${st.setsWon[1] ?? 0} in Sets`);
+    callSetWon(st.setsWon[p], 1 - st.setsWon[p]);
+  }
   if (ev.type === 'leg' || ev.type === 'match') {
     if (legVisitStartBefore === 170) callBigFish();
     const oppLegs = st.players.length > 1 ? Math.max(...st.legsWon.filter((_, i) => i !== p)) : 0;
     buzz(HAPTIC.gameShot);
     callGameShot(st.legsWon[p], oppLegs, ev.type === 'match');
-    flashBig('GAME SHOT', 'gameshot', ev.type === 'match' ? st.players[p].name + ' gewinnt das Spiel' : st.players[p].name + ' holt das Leg in ' + (ev.darts || '?') + ' Darts');
+    flashBig('GAME SHOT', 'gameshot', ev.type === 'match' ? st.players[p].name + ' gewinnt das Spiel' + (st.setsTo ? ` ${st.setsWon[0]}-${st.setsWon[1] ?? 0} in Sets` : '') : st.players[p].name + ' holt das Leg in ' + (ev.darts || '?') + ' Darts');
   }
-  if (ev.type === 'match') { finishSession(session, false, ev); return ev; }
+  if (ev.type === 'match') {
+    // Match-Moment SICHTBAR lassen (Flash + Rest), dann nahtlos in die Auswertung
+    clearTimeout(session._turnHoldTimer);
+    session._turnHoldTimer = setTimeout(() => { session._turnHoldTimer = null; finishSession(session, false, ev); }, 1800);
+    return ev;
+  }
 
   if (rerenderView) {
-    if (ev.type === 'turn' || ev.type === 'noin' || ev.type === 'bust') {
+    if (ev.type === 'set' || ev.type === 'leg') {
+      // SET!/GAME-SHOT-Flash + 3. Dart stehen lassen: min 1,6 s oder bis Ansage grob fertig
+      const hold = Math.max(1600, callerBusyMs());
+      clearTimeout(session._turnHoldTimer);
+      session._turnHoldTimer = setTimeout(() => { session._turnHoldTimer = null; rerenderView(); }, hold);
+    } else if (ev.type === 'turn' || ev.type === 'noin' || ev.type === 'bust') {
       // DRITTE ZAHL SICHTBAR (Kays Test): Pills + Visit-Score stehen lassen —
       // mindestens 1,2 s ODER bis der Caller-Satz fertig ist (was länger ist).
       const hold = turnHoldMs(callerBusyMs());
@@ -431,8 +470,8 @@ function showResultDialog(record, aborted) {
       ) : ''
     ),
     el('div', { class: 'row' },
-      el('button', { class: 'btn primary', onclick: () => { location.hash = '#/play'; rerender(); } }, 'Neues Spiel'),
-      el('button', { class: 'btn', onclick: () => { location.hash = '#/stats'; rerender(); } }, 'Zur Statistik')
+      el('button', { class: 'btn primary wide', onclick: () => { location.hash = '#/stats'; rerender(); } }, icon('i-chart'), 'Statistik ansehen'),
+      el('button', { class: 'btn', onclick: () => { location.hash = '#/play'; rerender(); } }, 'Neues Spiel')
     )
   );
 }

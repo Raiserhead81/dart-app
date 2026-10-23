@@ -16,9 +16,11 @@ export function newX01(opts = {}) {
     doubleOut: opts.doubleOut !== false,
     doubleIn: opts.doubleIn === true,
     firstTo: opts.firstTo || 1,
+    setsTo: opts.setsTo || 0,        // 0 = nur Legs (keine Sets); 3/5/7 = Best of N Sets
     players,
     current: 0,
     legsWon: players.map(() => 0),
+    setsWon: players.map(() => 0),
     winner: -1,
     finished: false,
     throws: players.map(() => []),   // alle Wuerfe mit Segment (Statistik-Rohdaten)
@@ -89,8 +91,13 @@ function endVisit(state) {
   leg.visitStart = leg.remaining[state.current];
 }
 
+// Sets-Helfer: Best of N -> benoetigte Set-Siege
+export function setsNeeded(state) {
+  return state.setsTo ? Math.ceil(state.setsTo / 2) : 0;
+}
+
 // Ein Dart anwenden. Liefert Event fuer UI:
-// { type: 'ok'|'noin'|'bust'|'turn'|'leg'|'match', player, throw, message, darts? }
+// { type: 'ok'|'noin'|'bust'|'turn'|'leg'|'set'|'match', player, throw, message, darts? }
 export function applyDart(state, thr) {
   if (state.finished) return { type: 'match', message: 'Spiel beendet' };
   const t = thr && thr.k ? thr : makeThrow('miss', 0);
@@ -144,6 +151,25 @@ export function applyDart(state, thr) {
       finishedAt: new Date().toISOString()
     });
     state.legsWon[p]++;
+    if (state.setsTo) {
+      // SETS-Modus: legsWon zaehlt nur im AKTUELLEN Set; firstTo = Legs je Set.
+      const needed = setsNeeded(state);
+      if (state.legsWon[p] >= state.firstTo) {
+        state.setsWon[p]++;
+        if (state.setsWon[p] >= needed) {
+          state.finished = true;
+          state.winner = p;
+          return { ...ev, type: 'match', message: `${state.players[p].name} gewinnt das Spiel ${state.setsWon[0]}-${state.setsWon[1] ?? 0} in Sets!`, darts: dartsUsed, sets: [...state.setsWon] };
+        }
+        state.legsWon = state.players.map(() => 0); // neues Set: Legs bei 0
+        const starter = nextPlayer(state);
+        resetLeg(state, starter);
+        return { ...ev, type: 'set', message: `SET! ${state.players[p].name} ${state.setsWon[0]}-${state.setsWon[1] ?? 0}`, darts: dartsUsed, sets: [...state.setsWon] };
+      }
+      const starter = nextPlayer(state);
+      resetLeg(state, starter);
+      return { ...ev, type: 'leg', message: `Leg an ${state.players[p].name} (${dartsUsed} Darts)`, darts: dartsUsed };
+    }
     if (state.legsWon[p] >= state.firstTo) {
       state.finished = true;
       state.winner = p;

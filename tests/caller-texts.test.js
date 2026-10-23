@@ -54,3 +54,11 @@ describe('Caller-Satzliste: rest-Komplettbereich 2..501', () => {
     expect(sentences['en/ph-gameshot-high']).toBe('GAME SHOT!!');
   });
 });
+
+// KAY-NEU: ph-set ("SET!") ist Teil der Satzliste (Set-Gewinn-Ansage)
+describe('Caller-Satzliste: ph-set', () => {
+  it('ph-set vorhanden', () => {
+    const s = buildCallerSentences();
+    expect(s['en/ph-set']).toBe('SET!');
+  });
+});

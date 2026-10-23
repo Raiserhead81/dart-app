@@ -350,6 +350,7 @@ function textForClipId(id) {
   }
   if ((m = id.match(/^visit-(\d+)$/))) return throwCallerWords({ k: 'sum', v: +m[1] }, settings.lang) + '!!';
   if (id === 'ph-180') return 'One hundred and eighty!';
+  if (id === 'ph-set') return 'Set!';
   if (id === 'ph-bust') return settings.lang === 'de' ? 'Kein Score!' : 'No score!';
   if (id === 'ph-match') return 'Game, set and match!';
   if (id === 'ph-bigfish') return 'Big fish!';
@@ -425,6 +426,17 @@ export function callVisitHigh(points) {
 export function callBigFish() {
   if (!settings.enabled) return;
   enqueueSequence([{ clipId: 'ph-bigfish', gapBeforeMs: 220 }], { replace: true });
+}
+
+// KAY-NEU: Set-Gewinn — "Set!" + Setstand (x-y via ph-leg-Clips)
+export function callSetWon(setsMe, setsOpp) {
+  if (!settings.enabled) return;
+  const a = Math.min(3, Math.max(0, setsMe | 0));
+  const b = Math.min(3, Math.max(0, setsOpp | 0));
+  enqueueSequence([
+    { clipId: 'ph-set', gapBeforeMs: 250 },
+    { clipId: `ph-leg-${a}-${b}`, gapBeforeMs: 200 }
+  ], { replace: true });
 }
 
 export function callDoubleRequired(dNumber, forMatch = false) {

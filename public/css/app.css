@@ -345,3 +345,8 @@ button.listitem strong { color: var(--cream); }
 .pbcard .sub{color:#c9b8a8;font-size:14px}
 .heat-dark svg{filter:drop-shadow(0 12px 30px rgba(0,0,0,.5))}
 .darkpanel h2 .sub{margin-left:10px}
+
+/* ===== Sets (KAY-NEU): Set-Chips an der Spielerkarte + Setstand ===== */
+.legbox.set{width:12px;height:12px;border-radius:4px;margin-left:3px;background:rgba(255,255,255,.12)}
+.legbox.set.won{background:#d9a441;box-shadow:0 0 10px rgba(217,164,65,.55)}
+.sets-score{font-weight:900;font-size:12px;color:#e8dfc8;letter-spacing:.06em}
