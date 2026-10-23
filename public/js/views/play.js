@@ -2,7 +2,7 @@
 // riesige Scores). Zahlenpad ist die Haupteingabe — Tap zaehlt SOFORT, Auto-Weiter nach
 // 3 Darts. Board nur optional als Overlay ("Scheibe zeigen", Standard aus).
 
-import { newX01, applyDart } from '/js/core/x01.js';
+import { newX01, applyDart, setupFromSettings } from '/js/core/x01.js';
 import { newCricket, applyCricketDart, cricketNextTurn } from '/js/core/cricket.js';
 import { buildX01GameRecord } from '/js/core/result.js';
 import { makeThrow } from '/js/core/segments.js';
@@ -34,7 +34,8 @@ export function renderPlay(view, arg) {
 function renderSetup(view) {
   const profiles = store.state.profiles.map(p => p.name);
   const names = [...new Set([activePlayer(), ...profiles, 'Spieler 2', 'Spieler 3', 'Spieler 4'])].slice(0, 4);
-  const sel = { mode: store.state.settings.lastMode || 'x01', start: 501, doubleOut: true, doubleIn: false, firstTo: 3, count: 1, useBoard: false };
+  // KAY-NEU: gemerkte Voreinstellung — zuletzt genutzte Kombi ist vorausgewaehlt
+  const sel = { ...setupFromSettings(store.state.settings), doubleOut: true, doubleIn: false, count: 1, useBoard: false };
 
   const nameInputs = names.map((n, i) => el('input', {
     type: 'text', value: i === 0 ? n : n.startsWith('Spieler') ? '' : n,
@@ -42,15 +43,17 @@ function renderSetup(view) {
   }));
 
   const startChips = STARTS.map(s => el('button', {
-    class: 'chip num' + (s === 501 ? ' on' : ''), onclick: (e) => {
+    class: 'chip num' + (s === sel.start ? ' on' : ''), onclick: (e) => {
       sel.start = s;
       startChips.forEach(c => c.classList.remove('on'));
       e.currentTarget.classList.add('on');
     }
   }, String(s)));
 
+  const ftLabel = el('div', { class: 'small muted mt', style: 'margin:0 0 -6px' },
+    sel.setsTo > 0 ? 'Legs pro Satz (Set)' : 'Legs fürs ganze Match (First to)');
   const ftChips = [1, 2, 3, 5].map(n => el('button', {
-    class: 'chip' + (n === 3 ? ' on' : ''), onclick: (e) => {
+    class: 'chip' + (n === sel.firstTo ? ' on' : ''), onclick: (e) => {
       sel.firstTo = n;
       ftChips.forEach(c => c.classList.remove('on'));
       e.currentTarget.classList.add('on');
@@ -59,10 +62,12 @@ function renderSetup(view) {
 
   // KAY-NEU: Sätze konfigurierbar — Best of N oder nur Legs (Default)
   sel.setsTo = store.state.settings.lastSetsTo || 0;
+  const setsLabel = el('div', { class: 'small muted mt', style: 'margin:0 0 -6px' }, 'Sätze');
   const setChips = [0, 3, 5, 7].map(n => el('button', {
     class: 'chip' + (sel.setsTo === n ? ' on' : ''), onclick: (e) => {
       sel.setsTo = n;
       store.state.settings.lastSetsTo = n;
+      ftLabel.textContent = sel.setsTo > 0 ? 'Legs pro Satz (Set)' : 'Legs fürs ganze Match (First to)';
       setChips.forEach(c => c.classList.remove('on'));
       e.currentTarget.classList.add('on');
     }
@@ -102,6 +107,9 @@ function renderSetup(view) {
         store.state.session = { type: 'cricket', state: st, snapshots: [], useBoard: sel.useBoard, date: new Date().toISOString() };
       }
       store.state.settings.lastMode = sel.mode;
+      store.state.settings.lastStart = sel.start;
+      store.state.settings.lastFirstTo = sel.firstTo;
+      store.state.settings.lastSetsTo = sel.setsTo;
       store.save();
       window.__DARTPRO_SESSION_ACTIVE = true;
       // iOS-PWA: Audio-Element-Pool JETZT (in der User-Geste) vorbereiten, damit
@@ -122,8 +130,10 @@ function renderSetup(view) {
       el('div', { class: 'row' }, ...modeChips),
       x01opts,
       el('div', { class: 'row mt' }, ...startChips),
-      el('div', { class: 'row mt' }, ...ftChips),
-      el('div', { class: 'row mt' }, ...setChips)
+      ftLabel,
+      el('div', { class: 'row' }, ...ftChips),
+      setsLabel,
+      el('div', { class: 'row' }, ...setChips)
     ),
     el('div', { class: 'panel' },
       el('h2', {}, 'Spieler', el('span', { class: 'sub' }, '1 bis 4, lokal')),
@@ -151,6 +161,7 @@ function renderX01Game(view) {
     el('span', { class: 'spacer' }),
     el('button', { class: 'gbtn', onclick: () => undo(session), title: 'Undo' }, icon('i-undo'), el('span', { class: 'hide-sm' }, 'Undo')),
     session.useBoard ? el('button', { class: 'gbtn', onclick: () => showBoardOverlay(session) }, icon('i-target'), el('span', { class: 'hide-sm' }, 'Scheibe')) : '',
+    el('button', { class: 'gbtn', onclick: () => { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) {} }, title: 'Vollbild' }, icon('i-target')),
     el('button', { class: 'gbtn danger', onclick: endEarly, title: 'Beenden' }, icon('i-x'))
   );
 

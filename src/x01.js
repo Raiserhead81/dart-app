@@ -199,3 +199,14 @@ export function currentCheckoutHint(state, dartsLeft) {
 export function cloneState(state) {
   return JSON.parse(JSON.stringify(state));
 }
+
+// KAY-NEU: gemerkte Voreinstellung fuer "Neues Spiel" (zuletzt genutzte Kombi wird
+// gespeichert und vorausgewaehlt — Kay tippt dann nur noch auf Start).
+export function setupFromSettings(settings = {}) {
+  return {
+    mode: settings.lastMode || 'x01',
+    start: settings.lastStart || 501,
+    firstTo: settings.lastFirstTo || 3,   // ohne Sets: Legs fuers Match; mit Sets: Legs pro Satz
+    setsTo: settings.lastSetsTo || 0      // 0 = Keine Sets; 3/5/7 = Best of N Sets
+  };
+}

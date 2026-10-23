@@ -30,7 +30,7 @@ export function lineChart(series, { height = H, yMin = null, yMax = null } = {})
     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
     line.setAttribute('x1', PAD.l); line.setAttribute('x2', W - PAD.r);
     line.setAttribute('y1', yy); line.setAttribute('y2', yy);
-    line.setAttribute('stroke', '#243129'); line.setAttribute('stroke-width', 1);
+    line.setAttribute('stroke', '#2c3a44'); line.setAttribute('stroke-width', 1);
     svg.append(line);
     const t = document.createElementNS('http://www.w3.org/2000/svg', 'text');
     t.setAttribute('x', PAD.l - 6); t.setAttribute('y', yy + 4);
@@ -63,7 +63,7 @@ export function lineChart(series, { height = H, yMin = null, yMax = null } = {})
     p.setAttribute('d', d || 'M0 0');
     p.setAttribute('fill', 'none');
     p.setAttribute('stroke', s.color);
-    p.setAttribute('stroke-width', 2.4);
+    p.setAttribute('stroke-width', 3.2);
     p.setAttribute('stroke-linecap', 'round');
     p.setAttribute('stroke-linejoin', 'round');
     svg.append(p);
@@ -71,9 +71,9 @@ export function lineChart(series, { height = H, yMin = null, yMax = null } = {})
     s.values.forEach((v, i) => {
       if (v == null) return;
       const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-      c.setAttribute('cx', x(i)); c.setAttribute('cy', y(v)); c.setAttribute('r', 3);
+      c.setAttribute('cx', x(i)); c.setAttribute('cy', y(v)); c.setAttribute('r', 4.2);
       c.setAttribute('fill', s.color);
-      c.append(Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'title'), { textContent: `${labels[i]}: ${v}` }));
+      c.append(Object.assign(document.createElementNS('http://www.w3.org/2000/svg', 'title'), { textContent: `${labels[i]} · ${s.label ? s.label + ' ' : ''}${v}` }));
       svg.append(c);
     });
   }

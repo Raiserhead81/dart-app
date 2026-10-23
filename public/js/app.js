@@ -75,5 +75,10 @@ window.addEventListener('beforeunload', (e) => {
 });
 
 configureCaller(store.state.settings?.caller || {});
+
+// KAY-NEU: "Als App installieren" — Install-Prompt global fangen (Android/Chrome).
+window.__installEvt = null;
+window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); window.__installEvt = e; rerender(); });
+window.addEventListener('appinstalled', () => { window.__installEvt = null; store.state.settings.installed = true; store.save(); rerender(); });
 startUpdateWatcher(60000);
 rerender();

@@ -20,9 +20,9 @@ const TIPS = {
     text: (w) => `25 Darts auf T20, drei Durchgaenge. Notiere deine Hits – ab 8/25 bist du solide, 12/25 stark. Danach 20 Darts auf T19 (fuer 140+-Aufnahmen, wenn T20 blockiert ist).`
   },
   t20: {
-    training: 't20',
-    title: 'Triple 20 treffen',
-    text: (w) => `Gruppe fixieren: 25 Darts nur auf T20. Achte auf identischen Stand und Wurfbogen. Wenn die 20 blockiert ist: bewusst auf T19 wechseln, nicht "danebenwerfen". Ziel diese Woche: +2 Hits gegenüber dem letzten Lauf.`
+    training: 'shanghai',
+    title: 'Triple-Wechsel-Drill',
+    text: (w) => `Shanghai-Drill: jede Zahl in T -> S -> D. Der Wechsel zwischen Triple, Single und Doppel fixiert den Wurfbogen — genau was 140+-Aufnahmen fehlt. Danach 15 Darts bewusst auf T19 (T20-Block-Wechsel). Ziel: +2 Triple-Hits gegenüber dem letzten Lauf.`
   },
   first9: {
     training: 'atc',
@@ -31,9 +31,16 @@ const TIPS = {
   }
 };
 
+// Kein Drill doppelt: faellt ein Training schon an, rutscht ein Ersatz nach.
+const ALTERNATES = { t20: 'shanghai', shanghai: 't20', doublesAtc: 'bob27', checkout: 'bob27', atc: 'shanghai' };
+
 export function tipsFor(analysis) {
+  const used = new Set();
   return analysis.weaknesses.slice(0, 3).map((w, i) => {
     const tip = TIPS[w.key] || TIPS.scoring;
+    let training = tip.training;
+    if (used.has(training)) training = ALTERNATES[training] || 'atc';
+    used.add(training);
     return {
       rank: i + 1,
       key: w.key,
@@ -41,8 +48,8 @@ export function tipsFor(analysis) {
       severity: w.severity,
       title: tip.title,
       text: tip.text(w),
-      training: tip.training,
-      trainingLabel: TRAINING_TYPES[tip.training] || tip.training
+      training,
+      trainingLabel: TRAINING_TYPES[training] || training
     };
   });
 }

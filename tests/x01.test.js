@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { newX01, applyDart } from '../src/x01.js';
+import { newX01, applyDart, setupFromSettings } from '../src/x01.js';
 import { makeThrow, parseThrowInput } from '../src/segments.js';
 
 const T20 = () => makeThrow('triple', 20);
@@ -180,4 +180,45 @@ describe('X01 Sets-Modus', () => {
     expect(s.setsWon).toEqual([1]);
     expect(s.leg.legNo).toBe(2);
   });
+});
+
+// KAY-NEU: gemerkte Voreinstellung (zuletzt genutzte Kombi bleibt vorausgewaehlt)
+describe('Setup-Voreinstellung (setupFromSettings)', () => {
+  it('Defaults ohne gespeicherte Werte: 501 / First to 3 / Keine Sets / X01', () => {
+    const d = setupFromSettings({});
+    expect(d).toEqual({ mode: 'x01', start: 501, firstTo: 3, setsTo: 0 });
+  });
+
+  it('zuletzt genutzte Kombi wird uebernommen (Kays Modus: 3 Legs je Set, Best of 5)', () => {
+    const d = setupFromSettings({ lastMode: 'x01', lastStart: 501, lastFirstTo: 3, lastSetsTo: 5 });
+    expect(d.firstTo).toBe(3);   // Legs pro Satz
+    expect(d.setsTo).toBe(5);    // Best of 5 Sets
+    const s = newX01({ start: d.start, players: ['A', 'B'], firstTo: d.firstTo, setsTo: d.setsTo });
+    expect(s.setsTo).toBe(5);
+    expect(s.firstTo).toBe(3);
+  });
+
+  it('Best of 5: Match bei 3-2 (Satzgewinn entscheidet)', () => {
+    const s = newX01({ start: 501, players: ['A', 'B'], firstTo: 1, setsTo: 5 });
+    // A holt Set 1, B Set 2, A Set 3, B Set 4, A Set 5 -> 3-2
+    const winners = [0, 1, 0, 1, 0];
+    const evs = winners.map(w => finishLegFor(s, w));
+    expect(s.setsWon).toEqual([3, 2]);
+    expect(evs[4].type).toBe('match');
+    expect(evs.every(e => ['set', 'match'].includes(e.type))).toBe(true);
+  });
+
+  it('Leg-Gewinn ohne Set-Ende bleibt "leg" (Legstand-Call pro Set)', () => {
+    const s = newX01({ start: 501, players: ['A', 'B'], firstTo: 2, setsTo: 3 });
+    const ev = finishLegFor(s, 0);
+    expect(ev.type).toBe('leg'); // erstes Leg von 2: kein Set-Ende
+    expect(s.legsWon).toEqual([1, 0]);
+    expect(s.setsWon).toEqual([0, 0]);
+  });
+
+  function finishLegFor(s, p) {
+    s.current = p;
+    s.leg.remaining[p] = 40;
+    return applyDart(s, { k: 'double', n: 20, c: 'D20', v: 40 });
+  }
 });

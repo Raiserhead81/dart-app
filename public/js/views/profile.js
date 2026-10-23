@@ -138,6 +138,26 @@ export function renderProfile(view) {
     }
   }).catch(() => {});
 
+  // ----- Als App installieren (Fullscreen ohne Browserchrom) -----
+  const installRow = (() => {
+    const standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+    if (standalone || store.state.settings.installed) return '';
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const btn = el('button', {
+      class: 'btn primary wide mt',
+      onclick: async () => {
+        const evt = window.__installEvt;
+        if (evt) { evt.prompt(); const r = await evt.userChoice; if (r && r.outcome === 'accepted') { store.state.settings.installed = true; store.save(); rerender(); } }
+        else toast(isIOS ? 'iPhone: In Safari → Teilen → „Zum Home-Bildschirm"' : 'Menü → „Zum Startbildschirm hinzufügen"');
+      }
+    }, icon('i-download'), window.__installEvt ? 'Als App installieren' : isIOS ? 'Zum Home-Bildschirm hinzufügen' : 'Als App installieren');
+    return el('div', { class: 'panel' },
+      el('h2', {}, 'Vollbild', el('span', { class: 'sub' }, 'ohne Browserleiste — wie eine echte App')),
+      el('p', { class: 'muted small', style: 'margin:0 0 4px' }, isIOS ? 'iPhone: Safari → Teilen → Zum Home-Bildschirm' : 'Installiert DartPro als App (Android/Chrome).'),
+      btn);
+  })();
+  view.append(installRow);
+
   // ----- Daten -----
   const fileInput = el('input', { type: 'file', accept: 'application/json', style: 'display:none' });
   fileInput.addEventListener('change', async (e) => {

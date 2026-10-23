@@ -51,4 +51,13 @@ if (hero) await hero.screenshot({ path: OUT + '/stats-after-match-hero.png' });
 const lm = await page.$('#lastmatch');
 if (lm) await lm.screenshot({ path: OUT + '/stats-after-match-card.png' });
 console.log('stats-after-match*.png');
+
+// 4) Persistenz: 'Neues Spiel' -> Kombi vorausgewaehlt (Best of 3, First to 1, 'Legs pro Satz')
+await page.evaluate(() => { location.hash = '#/play'; });
+await page.waitForSelector('.chip', { timeout: 10000 });
+await page.waitForTimeout(500);
+const chipsOn = await page.locator('.chip.on').evaluateAll(els => els.map(e => e.textContent).join('|'));
+console.log('Persistenz-Chips:', chipsOn);
+await page.screenshot({ path: OUT + '/setup-persisted.png' });
+console.log('setup-persisted.png');
 await browser.close();

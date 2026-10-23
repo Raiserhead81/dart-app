@@ -127,9 +127,9 @@ export function renderStats(view, arg) {
 
   // ===== Verlauf: fetter Wochen-Chart + Wochenvergleich mit ±-Badges =====
   const chart = lineChart([
-    { values: trend.map(t => t.stats.avg3), labels: trend.map(t => t.label), color: '#ff6b57' },
-    { values: trend.map(t => t.stats.doubles.pct), labels: trend.map(t => t.label), color: '#e8dfc8' },
-    { values: trend.map(t => t.stats.checkout.pct), labels: trend.map(t => t.label), color: '#ffd479' }
+    { label: '3-Dart-Avg', values: trend.map(t => t.stats.avg3), labels: trend.map(t => t.label), color: '#ff6b57' },
+    { label: 'Doppel %', values: trend.map(t => t.stats.doubles.pct), labels: trend.map(t => t.label), color: '#e8dfc8' },
+    { label: 'Checkout %', values: trend.map(t => t.stats.checkout.pct), labels: trend.map(t => t.label), color: '#ffd479' }
   ], { yMin: 0, yMax: 100 });
   view.append(el('div', { class: 'darkpanel' },
     el('h2', {}, 'Verlauf · 12 Wochen', el('span', { class: 'sub' }, 'ISO-Wochen, Montag-Start')),
