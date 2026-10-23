@@ -62,6 +62,7 @@ export function buildCallerSentences() {
   // ("GAME SHOT!!") mit mehr style — die Basis-Phrasen hier bleiben die ruhige Version.
   out['en/ph-gameshot'] = 'Game shot!';
   out['en/ph-set'] = 'SET!';
+  out['en/ph-perf'] = 'What a performance!!';
   out['en/ph-gameshot-1'] = 'Game shot! One leg to play.';
   out['en/ph-gameshot-2'] = 'Game shot! Two legs to play.';
   out['en/ph-gameshot-3'] = 'Game shot! Three legs to play.';

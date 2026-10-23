@@ -10,7 +10,8 @@ import { suggestCheckout } from '/js/core/checkout.js';
 import { addGame } from '/js/core/storage.js';
 import { buildBoard } from '/js/board.js';
 import { el, icon, toast, uid } from '/js/util.js';
-import { callDart, callVisitEnd, callGameShot, callSetWon, callDoubleRequired, callBigFish, clearQueue, flushPending, callerBusyMs, callerSettings, preloadForRest, unlockAudio, warmAudioPool } from '/js/caller-voice.js';
+import { callDart, callVisitEnd, callGameShot, callSetWon, callWhatPerformance, callDoubleRequired, callBigFish, clearQueue, flushPending, callerBusyMs, callerSettings, preloadForRest, unlockAudio, warmAudioPool } from '/js/caller-voice.js';
+import { newRecordsBroken } from '/js/core/records.js';
 import { turnHoldMs } from '/js/core/turnhold.js';
 import { padThrow, padSpecial, pushSnapshot, popSnapshot, checkoutLine, HAPTIC } from '/js/core/pad.js';
 import { activePlayer, store, rerender } from '/js/app.js';
@@ -368,9 +369,26 @@ function doThrow(session, t, { rerenderView } = {}) {
     flashBig('GAME SHOT', 'gameshot', ev.type === 'match' ? st.players[p].name + ' gewinnt das Spiel' + (st.setsTo ? ` ${st.setsWon[0]}-${st.setsWon[1] ?? 0} in Sets` : '') : st.players[p].name + ' holt das Leg in ' + (ev.darts || '?') + ' Darts');
   }
   if (ev.type === 'match') {
+    // KAY-NEU: Rekorde pruefen (Avg/Checkout/180er gegen bisherigen Bestand)
+    const winnerName = st.players[p].name;
+    let broken = [];
+    try {
+      const record = buildX01GameRecord(st, { id: session.id || st.id, date: new Date().toISOString() });
+      const fresh = (record.results || []).find(r => r.player === winnerName);
+      const gamesWithout = store.state.games.filter(g => g.id !== (session.id || st.id));
+      broken = newRecordsBroken(gamesWithout, winnerName, fresh);
+    } catch (e) { /* Rekord-Check darf das Spiel nie brechen */ }
+    if (broken.length) {
+      buzz(HAPTIC.oneEighty);
+      flashBig('NEUER REKORD!', 'record', broken.map(b => b.label).join('  ·  '));
+      goldBurst();
+      callWhatPerformance();
+    } else {
+      goldBurst();
+    }
     // Match-Moment SICHTBAR lassen (Flash + Rest), dann nahtlos in die Auswertung
     clearTimeout(session._turnHoldTimer);
-    session._turnHoldTimer = setTimeout(() => { session._turnHoldTimer = null; finishSession(session, false, ev); }, 1800);
+    session._turnHoldTimer = setTimeout(() => { session._turnHoldTimer = null; finishSession(session, false, ev); }, broken.length ? 2200 : 1800);
     return ev;
   }
 
@@ -405,6 +423,20 @@ function flashBig(text, kind, sub = null) {
   );
   host.append(box);
   setTimeout(() => { if (host.firstChild === box) host.innerHTML = ''; }, kind === 'gameshot' ? 1500 : 1100);
+}
+
+// Edler Gold-Burst (wenige grosse Splitter, kurz) bei Spiel-/Set-Gewinn
+function goldBurst() {
+  const host = document.getElementById('bigevent');
+  if (!host) return;
+  const layer = el('div', { class: 'goldburst' });
+  for (let i = 0; i < 14; i++) {
+    const a = (Math.PI * 2 * i) / 14 + Math.random() * 0.4;
+    const dist = 90 + Math.random() * 160;
+    layer.append(el('i', { style: `--dx:${Math.cos(a) * dist}px;--dy:${Math.sin(a) * dist - 40}px;--rot:${Math.round(Math.random() * 260 - 130)}deg;--d:${Math.round(Math.random() * 120)}ms` }));
+  }
+  host.append(layer);
+  setTimeout(() => { if (layer.parentNode === host) layer.remove(); }, 1400);
 }
 
 function undo(session) {

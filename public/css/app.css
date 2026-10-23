@@ -356,3 +356,29 @@ button.listitem strong { color: var(--cream); }
 .darkpanel .legend, .panel .legend{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 2px}
 .legend > span{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:999px;padding:4px 12px;font-size:12px;font-weight:700;color:#cfd8e3}
 .legend .sw{width:10px;height:10px;border-radius:50%;border:none;box-shadow:0 0 8px currentColor}
+
+/* ===== Episch-Layer 2 (Kay): Bewegung, Rekorde, Burst ===== */
+@keyframes viewIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.view{animation:viewIn .18s ease-out}
+@keyframes arrivePulse{0%{transform:scale(1)}40%{transform:scale(1.06);filter:brightness(1.35)}100%{transform:scale(1);filter:brightness(1)}}
+.hero-kpi.arrived{animation:arrivePulse .5s ease-out}
+.recordsec{background:linear-gradient(165deg,#241a10 0%,#12161F 70%);border-radius:18px;padding:16px 14px;margin:14px 0;box-shadow:0 20px 50px rgba(0,0,0,.5),0 0 0 1px rgba(217,164,65,.22)}
+.recordsec .kick{font-size:12px;letter-spacing:.22em;text-transform:uppercase;font-weight:900;color:#ffd479;text-shadow:0 0 18px rgba(217,164,65,.5);margin-bottom:10px}
+.recgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.reckpi{background:rgba(255,255,255,.03);border:1px solid rgba(217,164,65,.28);border-radius:14px;padding:12px 10px;text-align:center;position:relative}
+.reckpi .v{font-family:'Playfair Display',Georgia,serif;font-size:30px;font-weight:900;color:#ffd479;line-height:1.05;text-shadow:0 0 22px rgba(217,164,65,.45)}
+.reckpi .l{font-size:11px;color:#c9b8a8;font-weight:800;margin-top:4px}
+.reckpi .d{font-size:10px;color:#8fa0b5;margin-top:2px}
+.rebadge{position:absolute;top:-8px;right:10px;background:linear-gradient(135deg,#d9a441,#f0c060);color:#241a10;font-size:9px;font-weight:900;letter-spacing:.12em;border-radius:999px;padding:2px 8px;box-shadow:0 2px 10px rgba(217,164,65,.5)}
+.progchip{display:inline-flex;align-items:center;gap:8px;margin-top:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,212,121,.35);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:700;color:#ffd479;animation:viewIn .5s ease-out .9s backwards}
+.progchip .pa{font-weight:900}
+.progchip.up .pa{color:#5fdb95}
+.progchip.down .pa{color:#ff7b6b}
+.progchip.flat .pa{color:#8fa0b5}
+@keyframes heatPulse{0%{filter:brightness(2.4)}100%{filter:brightness(1)}}
+.heatseg{animation:heatPulse .55s ease-out backwards}
+@keyframes burstFly{0%{opacity:0;transform:translate(0,0) rotate(0) scale(.4)}10%{opacity:1}100%{opacity:0;transform:translate(var(--dx),var(--dy)) rotate(var(--rot)) scale(1.15)}}
+.goldburst{position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:5}
+.goldburst i{position:absolute;left:50%;top:50%;width:10px;height:16px;border-radius:3px;background:linear-gradient(180deg,#ffe9a8,#d9a441);box-shadow:0 0 14px rgba(217,164,65,.8);animation:burstFly 1.1s cubic-bezier(.2,.7,.3,1) var(--d) forwards;opacity:0}
+.bigevent.record .bigevent-text{color:#ffd479;text-shadow:0 0 40px rgba(217,164,65,.9),0 4px 30px rgba(0,0,0,.6)}
+.bigevent.record{background:radial-gradient(ellipse at center,rgba(217,164,65,.28),rgba(18,22,31,.92) 70%)}

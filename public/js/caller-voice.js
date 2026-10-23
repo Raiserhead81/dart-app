@@ -351,6 +351,7 @@ function textForClipId(id) {
   if ((m = id.match(/^visit-(\d+)$/))) return throwCallerWords({ k: 'sum', v: +m[1] }, settings.lang) + '!!';
   if (id === 'ph-180') return 'One hundred and eighty!';
   if (id === 'ph-set') return 'Set!';
+  if (id === 'ph-perf') return 'What a performance!';
   if (id === 'ph-bust') return settings.lang === 'de' ? 'Kein Score!' : 'No score!';
   if (id === 'ph-match') return 'Game, set and match!';
   if (id === 'ph-bigfish') return 'Big fish!';
@@ -426,6 +427,12 @@ export function callVisitHigh(points) {
 export function callBigFish() {
   if (!settings.enabled) return;
   enqueueSequence([{ clipId: 'ph-bigfish', gapBeforeMs: 220 }], { replace: true });
+}
+
+// KAY-NEU: Rekord-Moment — "What a performance!" (nach der Game-Shot-Ansage)
+export function callWhatPerformance() {
+  if (!settings.enabled) return;
+  enqueueSequence([{ clipId: 'ph-perf', gapBeforeMs: 400 }], { prio: 1 });
 }
 
 // KAY-NEU: Set-Gewinn — "Set!" + Setstand (x-y via ph-leg-Clips)

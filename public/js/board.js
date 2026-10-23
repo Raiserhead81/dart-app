@@ -108,6 +108,8 @@ export function buildBoard({ onThrow, size = 420 } = {}) {
 export function buildHeatmap(counts = {}, { size = 340 } = {}) {
   let max = 1;
   for (const v of Object.values(counts)) max = Math.max(max, v);
+  let total = 0;
+  for (const v of Object.values(counts)) total += v;
   const heat = document.createElementNS(NS, 'svg');
   heat.setAttribute('viewBox', `-30 -30 ${C * 2 + 60} ${C * 2 + 60}`);
   heat.setAttribute('class', 'dartboard');
@@ -138,7 +140,12 @@ export function buildHeatmap(counts = {}, { size = 340 } = {}) {
     ];
     for (const [kind, r0, r1] of bands) {
       const code = segmentCode(kind, number);
-      mk('path', { d: ringPath(a0, a1, r0 * C, r1 * C), fill: heatColor(counts[code] || 0), stroke: COL.wire, 'stroke-width': 1 });
+      const path = mk('path', { d: ringPath(a0, a1, r0 * C, r1 * C), fill: heatColor(counts[code] || 0), stroke: COL.wire, 'stroke-width': 1, class: 'heatseg' });
+      path.style.animationDelay = `${(i * 8) % 240}ms`;
+      const tt = document.createElementNS(NS, 'title');
+      const n = counts[code] || 0;
+      tt.textContent = n ? `${code}: ${n} Darts (${Math.round(n / total * 100)}%)` : `${code}: 0`;
+      path.append(tt);
     }
   });
   mk('circle', { cx: C, cy: C, r: RINGS.bullOut * C, fill: heatColor(counts['25'] || 0), stroke: COL.wire });

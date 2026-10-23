@@ -7,6 +7,8 @@ import { tipsFor } from '/js/core/tips.js';
 import { buildHeatmap } from '/js/board.js';
 import { lineChart } from '/js/charts.js';
 import { el, icon, pct } from '/js/util.js';
+import { bestRecords, } from '/js/core/records.js';
+import { countFormat, trendProjection } from '/js/core/statsfx.js';
 import { store, navigate } from '/js/app.js';
 
 const SERIES = [
@@ -125,6 +127,25 @@ export function renderStats(view, arg) {
     }
   }
 
+  // ===== REKORDE (Hero-Gold): beste Avg / Checkout / schnellstes Leg / 180er =====
+  const recs = bestRecords(games, current);
+  const recItems = [
+    ['Beste Avg', recs.avg?.v != null ? fmt(recs.avg.v) : '-', recs.avg?.date],
+    ['Beste Checkout', recs.checkout?.v != null ? pct(recs.checkout.v) : '-', recs.checkout?.date],
+    ['Schnellstes Leg', recs.fastestLeg ? `${recs.fastestLeg.darts} Darts` : '-', recs.fastestLeg?.date],
+    ['Meiste 180er', recs.most180 ? `${recs.most180.n}` : '-', recs.most180?.date]
+  ];
+  view.append(el('div', { class: 'recordsec' },
+    el('div', { class: 'kick' }, 'REKORDE'),
+    el('div', { class: 'recgrid' },
+      ...recItems.map(([l, v, d]) => el('div', { class: 'reckpi' },
+        el('span', { class: 'rebadge' }, 'REKORD'),
+        el('div', { class: 'v num' }, v),
+        el('div', { class: 'l' }, l),
+        el('div', { class: 'd' }, d || '')))
+    )
+  ));
+
   // ===== Verlauf: fetter Wochen-Chart + Wochenvergleich mit ±-Badges =====
   const chart = lineChart([
     { label: '3-Dart-Avg', values: trend.map(t => t.stats.avg3), labels: trend.map(t => t.label), color: '#ff6b57' },
@@ -146,8 +167,18 @@ export function renderStats(view, arg) {
         badge(t.delta?.avg),
         el('div', { class: 'num2 muted' }, `${t.stats.darts}`)
       ))
-    )
+    ),
+    (() => {
+      const proj = trendProjection(trend.map(t => t.stats.avg3), 4);
+      if (!proj) return '';
+      const arrow = proj.direction === 'up' ? '↗ steigend' : proj.direction === 'down' ? '↘ fallend' : '→ stabil';
+      const kw = 'KW' + (() => { const d = new Date(); d.setDate(d.getDate() + 7 * proj.horizon); return Math.ceil((((d - new Date(d.getFullYear(), 0, 1)) / 864e5) + new Date(d.getFullYear(), 0, 1).getDay() + 1) / 7); })();
+      return el('div', { class: 'progchip ' + proj.direction },
+        el('span', { class: 'pa' }, arrow), el('span', {},
+          `Wenn du so weitermachst: Ø ${String(proj.projected).replace('.', ',')} bis ${kw}`));
+    })()
   ));
+  animateStatsFx(view);
 
   // ----- Stärken / Schwächen -----
   view.append(el('div', { class: 'panel' },
@@ -215,4 +246,42 @@ export function renderStats(view, arg) {
         : el('div', { class: 'small muted' }, g.summary?.headline || '')
     ))) : el('p', { class: 'muted' }, 'Noch keine Spiele für dieses Profil.')
   ));
+}
+
+
+// ===== Episch-Layer: Count-Up der Key-Numbers + Chart Draw-In =====
+function animateCountUps(root) {
+  const nodes = [...root.querySelectorAll('.hero-num, .heromini .v, #lastmatch .v')];
+  for (const n of nodes) {
+    const raw = n.textContent.trim();
+    if (!/^\d+([.,]\d+)?$/.test(raw)) continue;
+    const target = parseFloat(raw.replace(',', '.'));
+    const dec = raw.includes(',') ? 1 : 0;
+    const t0 = performance.now();
+    const tick = (t) => {
+      const p = Math.min(1, (t - t0) / 800);
+      n.textContent = countFormat(target, p, dec);
+      if (p < 1) requestAnimationFrame(tick);
+      else n.closest('.hero-kpi')?.classList.add('arrived');
+    };
+    requestAnimationFrame(tick);
+  }
+}
+
+export function animateStatsFx(view) {
+  // Count-Up der grossen Zahlen
+  animateCountUps(view);
+  // Chart-Linien zeichnen sich sanft (stroke-dashoffset)
+  requestAnimationFrame(() => {
+    for (const path of view.querySelectorAll('.darkpanel svg path[d]')) {
+      try {
+        const len = path.getTotalLength();
+        if (!len || len > 5000) continue;
+        path.style.strokeDasharray = String(len);
+        path.style.strokeDashoffset = String(len);
+        path.style.transition = 'stroke-dashoffset 1.1s ease-out';
+        requestAnimationFrame(() => { path.style.strokeDashoffset = '0'; });
+      } catch (e) { /* egal */ }
+    }
+  });
 }
