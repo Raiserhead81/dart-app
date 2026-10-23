@@ -129,6 +129,10 @@ def main():
     ap.add_argument("--batch-size", type=int, default=25)
     ap.add_argument("--min-mp3-bytes", type=int, default=1000)
     ap.add_argument("--max-requests", type=int, default=95, help="hartes Tagesbudget (Paid-Key: 100/Tag)")
+    ap.add_argument("--model", default=None, help="fixes TTS-Modell (z.B. gemini-2.5-pro-preview-tts mit eigenem Tageslimit)")
+    ap.add_argument("--shard", default=None, help="Sharding 'i/n': nur Clips mit hash(clip)%%n==i — fuer parallele Prozesse")
+    ap.add_argument("--skip-manifest", action="store_true", help="manifest.json NICHT anfassen (Shard-Runs)")
+    ap.add_argument("--manifest-only", action="store_true", help="nur Manifest schreiben/normalisieren und enden")
     ap.add_argument("--full", default="true")
     args = ap.parse_args()
 
@@ -138,6 +142,10 @@ def main():
     key = open(args.key_file).read().strip()
     outdir = os.path.join(args.out, args.set_name, args.lang)
     os.makedirs(outdir, exist_ok=True)
+    if args.manifest_only:
+        update_manifest(args.out, args.set_name, args.label or args.set_name, args.voice, args.lang, args.full)
+        log("manifest-only fertig")
+        return
 
     # Resume: nur fehlende Clips; Euphorische und Routine NICHT im Batch mischen
     def is_euphoric(clip):
@@ -148,8 +156,12 @@ def main():
         path = os.path.join(outdir, clip + ".mp3")
         if os.path.exists(path) and os.path.getsize(path) > args.min_mp3_bytes:
             continue
+        if args.shard:
+            i, n = args.shard.split("/")
+            if hash(clip) % int(n) != int(i):
+                continue
         todo.append((clip, text, path))
-    log(f"{args.set_name}: {len(items)} Clips total, {len(todo)} fehlen")
+    log(f"{args.set_name}: {len(items)} Clips total, {len(todo)} fehlen" + (f" (Shard {args.shard})" if args.shard else ""))
 
     batches = []
     routine = [t for t in todo if not is_euphoric(t[0])]
@@ -176,10 +188,11 @@ def main():
             attempts += 1
             requests_used += 1
             try:
-                pcm = tts_request(key, args.voice, prompt, MODELS[0] if found_model is None else found_model)
-                if found_model is None:
-                    found_model = MODELS[0]
-                    log("Modell ok: " + found_model)
+                model = args.model or found_model or MODELS[0]
+                pcm = tts_request(key, args.voice, prompt, model)
+                if not found_model:
+                    found_model = model
+                    log("Modell ok: " + model)
                 break
             except Exception as e:
                 msg = str(e)[:300]
@@ -230,7 +243,8 @@ def main():
     if os.path.isdir(outdir):
         n = len([f for f in os.listdir(outdir) if f.endswith(".mp3")])
         log(f"Bestand {args.set_name}/{args.lang}: {n} mp3-Dateien")
-    update_manifest(args.out, args.set_name, args.label or args.set_name, args.voice, args.lang, args.full)
+    if not args.skip_manifest:
+        update_manifest(args.out, args.set_name, args.label or args.set_name, args.voice, args.lang, args.full)
     sys.exit(3 if fail_clips else 0)
 
 
