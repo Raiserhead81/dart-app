@@ -47,44 +47,83 @@ export function renderStats(view, arg) {
   ));
   view.append(el('h1', { class: 'serif', style: 'margin:2px 0 14px;font-size:30px' }, current));
 
-  // ----- KPIs -----
+  // ===== HERO (episch): RIESIGE Key-Numbers im LTHC-Bar-Look =====
   const delta = trend[11]?.delta;
-  const kpis = [
-    ['3-Dart-Avg', fmt(stats.avg3), delta?.avg, fmt],
-    ['First 9', fmt(stats.first9), delta?.first9, fmt],
-    ['Doppel-Quote', pct(stats.doubles.pct), delta?.doubles],
-    ['Checkout-Quote', pct(stats.checkout.pct), delta?.checkout],
-    ['Darts / Leg', fmt(stats.dartsPerLeg)],
-    ['Legs', `${stats.legsWon}/${stats.legsPlayed}`],
-    ['100+', String(stats.counts.c100)],
-    ['140+', String(stats.counts.c140)],
-    ['180', String(stats.counts.c180)],
-    ['T20-Quote', stats.t20.pct != null ? fmt(stats.t20.pct) + '%' : '-']
-  ].map(([label, value, d]) => el('div', { class: 'kpi' },
-    el('div', { class: 'label' }, label),
-    el('div', {}, el('span', { class: 'value num' }, value),
-      d != null ? el('span', { class: 'delta ' + (d >= 0 ? 'up' : 'down') }, (d >= 0 ? '↑ ' : '↓ ') + fmt(Math.abs(d))) : '')
-  ));
-  view.append(el('div', { class: 'grid kpi' }, ...kpis));
+  const badge = (d, invert = false) => {
+    if (d == null || isNaN(d)) return el('span', { class: 'badge flat' }, '± Vorwoche');
+    const good = invert ? d < 0 : d > 0;
+    return el('span', { class: 'badge ' + (good ? 'up' : 'down') }, (good ? '▲ ' : '▼ ') + fmt(Math.abs(d)) + (invert ? '' : ''));
+  };
+  const hero = el('div', { class: 'stathero' },
+    el('p', { class: 'kicker' }, 'Statistik'),
+    el('div', { class: 'row', style: 'justify-content:space-between;align-items:center;margin:2px 0 0' },
+      el('div', { class: 'stathero-name' }, current),
+      el('div', { style: 'max-width:200px' }, sel)
+    ),
+    el('div', { class: 'herorow' },
+      el('div', { class: 'hero-kpi red' },
+        el('div', { class: 'hero-num' }, fmt(stats.avg3)),
+        el('div', { class: 'hero-sub' }, '3-Dart-Avg'), el('div', { style: 'margin-top:6px' }, badge(delta?.avg))
+      ),
+      el('div', { class: 'hero-kpi gold' },
+        el('div', { class: 'hero-num' }, pct(stats.checkout.pct)),
+        el('div', { class: 'hero-sub' }, 'Checkout %'), el('div', { style: 'margin-top:6px' }, badge(delta?.checkout))
+      )
+    ),
+    el('div', { class: 'herominis' },
+      ...[
+        ['First 9', fmt(stats.first9)],
+        ['Doppel %', pct(stats.doubles.pct)],
+        ['180er', String(stats.counts.c180)],
+        ['T20 %', stats.t20.pct != null ? fmt(stats.t20.pct) : '-'],
+        ['Darts/Leg', fmt(stats.dartsPerLeg)],
+        ['Legs', `${stats.legsWon}/${stats.legsPlayed}`],
+        ['100+', String(stats.counts.c100)],
+        ['140+', String(stats.counts.c140)]
+      ].map(([l, v]) => el('div', { class: 'heromini' }, el('div', { class: 'v' }, v), el('div', { class: 'l' }, l)))
+    )
+  );
+  view.append(hero);
 
-  // ----- Wochenansicht -----
+  // ===== Bestmarken-Feier: letzte aktive Woche schlägt alle 12 Wochen? =====
+  const played = trend.filter(t => t.stats.darts > 0);
+  if (played.length >= 2) {
+    const last = played[played.length - 1];
+    const bestAvg = Math.max(...played.map(t => t.stats.avg3 || 0));
+    const bestCo = Math.max(...played.map(t => t.stats.checkout.pct || 0));
+    const pbAvg = (last.stats.avg3 || 0) >= bestAvg && bestAvg > 0;
+    const pbCo = (last.stats.checkout.pct || 0) >= bestCo && bestCo > 0;
+    if (pbAvg || pbCo) {
+      try { navigator.vibrate && navigator.vibrate([60, 80, 60, 80, 200]); } catch (e) { /* egal */ }
+      view.append(el('div', { class: 'pbcard' },
+        el('div', { class: 'kick' }, 'Neue Bestmarke'),
+        el('div', { class: 'big' }, pbAvg ? fmt(last.stats.avg3) : pct(last.stats.checkout.pct)),
+        el('div', { class: 'sub' }, pbAvg
+          ? `Persönlicher 3-Dart-Avg-Rekord in ${last.label} — Starke Woche!`
+          : `Beste Checkout-Quote aller Zeiten in ${last.label} — Kalte Kelle!`)
+      ));
+    }
+  }
+
+  // ===== Verlauf: fetter Wochen-Chart + Wochenvergleich mit ±-Badges =====
   const chart = lineChart([
-    { values: trend.map(t => t.stats.avg3), labels: trend.map(t => t.label), color: SERIES[0].color },
-    { values: trend.map(t => t.stats.doubles.pct), labels: trend.map(t => t.label), color: SERIES[2].color },
-    { values: trend.map(t => t.stats.checkout.pct), labels: trend.map(t => t.label), color: SERIES[3].color }
+    { values: trend.map(t => t.stats.avg3), labels: trend.map(t => t.label), color: '#ff6b57' },
+    { values: trend.map(t => t.stats.doubles.pct), labels: trend.map(t => t.label), color: '#e8dfc8' },
+    { values: trend.map(t => t.stats.checkout.pct), labels: trend.map(t => t.label), color: '#ffd479' }
   ], { yMin: 0, yMax: 100 });
-  view.append(el('div', { class: 'panel' },
+  view.append(el('div', { class: 'darkpanel' },
     el('h2', {}, 'Verlauf · 12 Wochen', el('span', { class: 'sub' }, 'ISO-Wochen, Montag-Start')),
     chart,
     el('div', { class: 'legend' },
-      el('span', {}, el('i', { class: 'sw', style: 'background:#46c47a' }), '3-Dart-Avg'),
-      el('span', {}, el('i', { class: 'sw', style: 'background:#cf4436' }), 'Doppel %'),
-      el('span', {}, el('i', { class: 'sw', style: 'background:#d9a441' }), 'Checkout %')
+      el('span', {}, el('i', { class: 'sw', style: 'background:#ff6b57' }), '3-Dart-Avg'),
+      el('span', {}, el('i', { class: 'sw', style: 'background:#e8dfc8' }), 'Doppel %'),
+      el('span', {}, el('i', { class: 'sw', style: 'background:#ffd479' }), 'Checkout %')
     ),
     el('div', { class: 'weekgrid mt' },
       ...trend.slice().reverse().filter(t => t.stats.darts > 0).map(t => el('div', { class: 'weekrow' },
         el('div', { class: 'wk' }, t.label),
         el('div', { class: 'txt' }, weekSummaryText(t)),
+        badge(t.delta?.avg),
         el('div', { class: 'num2 muted' }, `${t.stats.darts}`)
       ))
     )
@@ -124,7 +163,7 @@ export function renderStats(view, arg) {
     }
   }
 
-  // ----- Heatmap -----
+  // ----- Trefferbild: GROSS + zentral (episch, dunkle Tiefe) -----
   const boardCounts = {};
   for (const g of games) {
     for (const t of g.boardThrows || []) {
@@ -133,9 +172,9 @@ export function renderStats(view, arg) {
     }
   }
   const heatEntries = Object.values(boardCounts).reduce((a, b) => a + b, 0);
-  view.append(el('div', { class: 'panel' },
-    el('h2', {}, 'Trefferbild', el('span', { class: 'sub' }, heatEntries ? `${heatEntries} gewertete Darts` : 'nur mit Board-Eingabe')),
-    heatEntries >= 5 ? buildHeatmap(boardCounts, { size: 360 }) : el('p', { class: 'muted' }, 'Wirf über das Board ein, dann erscheint hier, welche Felder du triffst und welche verfehlst.'),
+  view.append(el('div', { class: 'darkpanel heat-dark' },
+    el('h2', {}, 'Trefferbild ', el('span', { class: 'sub' }, heatEntries ? `${heatEntries} gewertete Darts` : 'nur mit Board-Eingabe')),
+    heatEntries >= 5 ? buildHeatmap(boardCounts, { size: 440 }) : el('p', { class: 'muted' }, 'Wirf über das Board ein, dann erscheint hier, welche Felder du triffst und welche verfehlst.'),
     heatEntries >= 5 ? el('div', { class: 'heat-legend mt' },
       el('span', {}, 'selten'),
       ...['rgba(60,72,64,.4)', 'rgba(94,150,110,.6)', 'rgba(160,190,110,.8)', 'rgba(226,150,70,.95)'].map(c => el('i', { class: 'heat-swatch', style: 'background:' + c })),

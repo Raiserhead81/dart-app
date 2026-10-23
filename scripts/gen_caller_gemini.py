@@ -21,9 +21,6 @@ EUPHORIC_PREFIXES = ("ph-180", "ph-gameshot-high", "ph-match", "ph-bigfish", "ph
 ROUTINE_PROMPT = "You are a professional darts caller at the oche. Announce in your steady, clear caller voice: "
 HIGH_PROMPT = "You are an ecstatic professional darts caller. Announce this huge moment loudly and excitedly: "
 
-found_model = None
-
-
 def tts_request(key, voice, prompt_text, model):
     import urllib.request, urllib.error
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
@@ -55,7 +52,6 @@ def pcm_to_mp3(pcm, out_path):
 
 
 def main():
-    global found_model
     ap = argparse.ArgumentParser()
     ap.add_argument("--sentences", required=True)
     ap.add_argument("--out", default="/var/www/dart-app-caller")
@@ -65,6 +61,8 @@ def main():
     ap.add_argument("--key-file", default="/opt/gemma-live/gemini-key-paid")
     ap.add_argument("--lang", default="en")
     ap.add_argument("--workers", type=int, default=3)
+    ap.add_argument("--min-interval", type=float, default=4.0,
+                    help="Mindestabstand zwischen Request-Starts (Sekunden, global ueber alle Worker) — haelt RPM-Limit ein")
     ap.add_argument("--full", default="true")
     ap.add_argument("--model", default=None, help="fix; sonst Auto-Probe")
     args = ap.parse_args()
@@ -85,32 +83,56 @@ def main():
     print(f"{args.set_name}: {len(items)} Clips total, {len(todo)} zu generieren", flush=True)
 
     lock = __import__("threading").Lock()
+    state = {"model": None, "next_ok": 0.0, "done": 0}
+
+    # Globales Throttling: alle Worker teilen sich ein Mindestintervall zwischen
+    # Request-STARTS — ohne das fliegt der Key in 429/RESOURCE_EXHAUSTED.
+    def reserve_slot():
+        with lock:
+            now = time.time()
+            wait = state["next_ok"] - now
+            state["next_ok"] = max(now, state["next_ok"]) + args.min_interval
+            return wait if wait > 0 else 0.0
+
+    def parse_retry_delay(msg):
+        import re
+        m = re.search(r'"retryDelay":\s*"(\d+)s"', msg)
+        return int(m.group(1)) if m else None
 
     def work(pair):
         clip, text, path = pair
         prompt = (HIGH_PROMPT if clip.startswith(EUPHORIC_PREFIXES) else ROUTINE_PROMPT) + text
         models = [args.model] if args.model else MODELS
-        for attempt in range(4):
+        for attempt in range(10):  # 10 Versuche mit Exponential-Backoff (429-Kuehlphasen)
             for model in models:
+                wait = reserve_slot()
+                if wait:
+                    time.sleep(wait)
                 try:
-                    pcm = tts_request(key, args.voice, prompt, model)
+                    pcm = tts_request(key, args.voice, prompt, model)  # timeout 90s pro Request
                     with lock:
-                        if not found_model:
-                            found_model = model
+                        if not state["model"]:
+                            state["model"] = model
                             print(f"Modell ok: {model}", flush=True)
+                        state["done"] += 1
+                        if state["done"] % 10 == 0 or state["done"] == len(todo):
+                            import datetime
+                            print(f"[{datetime.datetime.now().strftime('%H:%M:%S')}] Fortschritt: {state['done']}/{len(todo)} ({clip})", flush=True)
                     return pcm_to_mp3(pcm, path)
                 except Exception as e:
-                    msg = str(e)[:160]
+                    msg = str(e)[:300]
                     if "429" in msg or "RESOURCE_EXHAUSTED" in msg:
-                        time.sleep(5 + attempt * 8)
+                        # retryDelay aus der Quota-Antwort respektieren (cap 90s), sonst exponentiell
+                        delay = parse_retry_delay(msg)
+                        time.sleep(min(90, delay) if delay else min(60, 4 ** attempt))
                         continue
                     if "404" in msg or "NOT_FOUND" in msg:
                         continue  # naechstes Modell probieren
                     if "400" in msg and "voiceName" in msg:
                         print(f"UNBEKANNTE STIMME '{args.voice}' bei {clip}: {msg}", flush=True)
                         raise SystemExit(4)
-                    print(f"HTTP-Fehler {clip}: {msg}", flush=True)
-                    time.sleep(2)
+                    print(f"HTTP-Fehler {clip} (Versuch {attempt + 1}): {msg[:160]}", flush=True)
+                    time.sleep(min(30, 3 * (attempt + 1)))
         print(f"FAILED nach Retries: {clip}", flush=True)
         return False
 
@@ -140,7 +162,7 @@ def main():
         "label": args.label or args.set_name,
         "provider": "gemini",
         "voice": args.voice,
-        "model": found_model or args.model or MODELS[0],
+        "model": state["model"] or args.model or MODELS[0],
         "langs": [args.lang],
         "full": str(args.full).lower() == "true",
     }

@@ -312,3 +312,36 @@ button.listitem .title { color: var(--cream); }
 button.listitem .sub { color: #b9c4bb; }
 button.listitem strong { color: var(--cream); }
 .planlist { color: var(--text); }
+
+/* ===== Statistik episch (LTHC-Bar-Design-Sprache: #1A202C/#C0392B, Serif-Zahlen,
+   dunkle Gradient-Bands, Rot-Glow, weiße 2px-Border-Karten) ===== */
+.stathero{background:linear-gradient(180deg,#141923 0%,#1A202C 55%,#12161F 100%);border-radius:18px;padding:18px 16px 16px;box-shadow:0 20px 50px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.06);color:#fff}
+.stathero .kicker{color:#8fa0b5;margin:0}
+.stathero-name{font-family:'Playfair Display',Georgia,serif;font-size:26px;font-weight:900;color:#fff;line-height:1.15}
+.herorow{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+.hero-kpi{border-radius:14px;padding:16px 10px 12px;text-align:center;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08)}
+.hero-kpi.red{border-color:rgba(192,57,43,.65);box-shadow:0 4px 16px rgba(192,57,43,.4)}
+.hero-kpi.gold{border-color:rgba(217,164,65,.55);box-shadow:0 4px 16px rgba(217,164,65,.28)}
+.hero-num{font-family:'Playfair Display',Georgia,serif;font-size:58px;font-weight:900;line-height:1;color:#fff;letter-spacing:-.01em}
+.hero-kpi.red .hero-num{color:#ff6b57;text-shadow:0 0 26px rgba(192,57,43,.6)}
+.hero-kpi.gold .hero-num{color:#ffd479;text-shadow:0 0 26px rgba(217,164,65,.5)}
+.hero-sub{margin-top:6px;font-size:11px;color:#8fa0b5;letter-spacing:.14em;text-transform:uppercase;font-weight:800}
+.herominis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:12px}
+.heromini{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:10px 6px;text-align:center}
+.heromini .v{font-family:'Playfair Display',Georgia,serif;font-size:22px;font-weight:900;color:#e8dfc8;line-height:1.1}
+.heromini .l{font-size:10px;color:#8fa0b5;letter-spacing:.08em;text-transform:uppercase;font-weight:800;margin-top:3px}
+.badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:900;letter-spacing:.02em}
+.badge.up{background:rgba(70,196,122,.16);color:#5fdb95}
+.badge.down{background:rgba(207,68,54,.16);color:#ff7b6b}
+.badge.flat{background:rgba(255,255,255,.08);color:#8fa0b5}
+.darkpanel{background:linear-gradient(165deg,#152238 0%,#0B1629 100%);border-radius:16px;padding:14px;margin:14px 0;box-shadow:0 20px 60px rgba(0,0,0,.4),0 0 0 1px rgba(255,255,255,.05)}
+.darkpanel h2{color:#fff}
+.darkpanel .muted{color:#8fa0b5}
+.weekrow .badge{margin-left:8px}
+@keyframes pbPulse{0%,100%{box-shadow:0 4px 16px rgba(192,57,43,.35),0 0 0 1px rgba(192,57,43,.4)}50%{box-shadow:0 4px 40px rgba(192,57,43,.85),0 0 0 1px rgba(255,120,100,.8)}}
+.pbcard{animation:pbPulse 1.5s ease-in-out 4;border:1px solid rgba(192,57,43,.55);border-radius:16px;padding:18px 16px;margin:14px 0;background:linear-gradient(180deg,#241318,#12161F);color:#fff;text-align:center}
+.pbcard .kick{font-size:12px;letter-spacing:.2em;text-transform:uppercase;font-weight:900;color:#ff6b57}
+.pbcard .big{font-family:'Playfair Display',Georgia,serif;font-size:42px;font-weight:900;margin:6px 0 2px;color:#fff;text-shadow:0 0 30px rgba(192,57,43,.55)}
+.pbcard .sub{color:#c9b8a8;font-size:14px}
+.heat-dark svg{filter:drop-shadow(0 12px 30px rgba(0,0,0,.5))}
+.darkpanel h2 .sub{margin-left:10px}
