@@ -42,8 +42,8 @@ for (const [i, ms] of [[0, 100], [1, 700], [2, 1400]]) {
   await page.waitForTimeout(i === 0 ? ms : ms - [0, 100, 700][i]);
   const vb = await page.textContent('#visitbar');
   const filled = (vb.match(/·/g) || []).length;
-  const path = OUT + `/pills-t${ms}ms.png`;
-  await page.screenshot({ path, clip: { x: 0, y: 0, width: 390, height: 500 } }).catch(() => {});
+  const elShot = await page.$('#visitbar');
+  if (elShot) await elShot.screenshot({ path: OUT + `/pills-t${ms}ms.png` }).catch(() => {});
   pillShots.push(`t${ms}ms: "${vb.trim().replace(/\s+/g, ' ')}" (leere Pills: ${filled})`);
 }
 console.log('PILL-Beweis (3 Dart-Pills muessen sichtbar sein):');
