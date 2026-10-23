@@ -41,6 +41,10 @@ export function buildCallerSentences() {
     out[`${lang}/dx-Bull-game`] = checkoutCallWords(50, lang, 'game', true);
     // Score-Zahlen 0..180 (Zahlworte; 0 = No score)
     for (let n = 0; n <= 180; n++) out[`${lang}/sc-${n}`] = numberToCallerWords(n, lang);
+    // 100+-Visit-Jubel (nur EN — euphorischer Call bei Visit >= 100)
+    if (lang === 'en') {
+      for (let n = VISIT_HIGH_MIN; n <= VISIT_HIGH_MAX; n++) out[`en/visit-${n}`] = `${numberToCallerWords(n, 'en')}!!`;
+    }
     // Segment-Calls
     out[`${lang}/seg-miss`] = throwCallerWords({ k: 'miss', n: 0, v: 0 }, lang);
     out[`${lang}/seg-bull`] = throwCallerWords({ k: 'bull', n: 50, v: 50 }, lang);

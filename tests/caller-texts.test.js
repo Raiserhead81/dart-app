@@ -62,3 +62,12 @@ describe('Caller-Satzliste: ph-set', () => {
     expect(s['en/ph-set']).toBe('SET!');
   });
 });
+
+// 100+-Visit-Jubel-Clips (visit-100..179) sind Teil der Satzliste
+describe('Caller-Satzliste: visit-High-Clips', () => {
+  it('visit-100..179 komplett gemappt (80 Clips)', () => {
+    const s = buildCallerSentences();
+    for (let n = 100; n <= 179; n++) expect(s[`en/visit-${n}`]).toBeTruthy();
+    expect(s['en/visit-157']).toBe('one hundred and fifty seven!!');
+  });
+});
