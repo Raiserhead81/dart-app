@@ -9,3 +9,5 @@ server/data/
 *.db-shm
 dist/
 .DS_Store
+__pycache__/
+*.pyc

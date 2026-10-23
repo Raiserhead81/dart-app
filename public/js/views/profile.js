@@ -117,7 +117,7 @@ export function renderProfile(view) {
     for (const s of full) {
       box.append(el('div', { class: 'row', style: 'justify-content:space-between;margin:4px 0' },
         el('button', {
-          class: 'chip' + ((caller.voiceSet || 'elevenlabs') === s.id ? ' on' : ''),
+          class: 'chip' + ((caller.voiceSet || 'gemma') === s.id ? ' on' : ''),
           onclick: (e) => {
             caller.voiceSet = s.id; configureCaller(caller); store.save();
             box.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
