@@ -13,7 +13,7 @@ const SHELL_FILES = [
   '/js/core/segments.js', '/js/core/x01.js', '/js/core/cricket.js', '/js/core/training.js',
   '/js/core/checkout.js', '/js/core/stats.js', '/js/core/weeks.js', '/js/core/analysis.js',
   '/js/core/tips.js', '/js/core/storage.js', '/js/core/result.js', '/js/core/pad.js',
-  '/js/core/benchmarks.js', '/js/core/caller.js', '/js/core/caller-sequence.js'
+  '/js/core/benchmarks.js', '/js/core/caller.js', '/js/core/caller-sequence.js', '/js/core/turnhold.js'
 ];
 
 self.addEventListener('install', (e) => {

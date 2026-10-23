@@ -10,7 +10,8 @@ import { suggestCheckout } from '/js/core/checkout.js';
 import { addGame } from '/js/core/storage.js';
 import { buildBoard } from '/js/board.js';
 import { el, icon, toast, uid } from '/js/util.js';
-import { callDart, callVisitEnd, callGameShot, callDoubleRequired, callBigFish, clearQueue, preloadForRest, unlockAudio, warmAudioPool } from '/js/caller-voice.js';
+import { callDart, callVisitEnd, callGameShot, callDoubleRequired, callBigFish, clearQueue, flushPending, callerBusyMs, callerSettings, preloadForRest, unlockAudio, warmAudioPool } from '/js/caller-voice.js';
+import { turnHoldMs } from '/js/core/turnhold.js';
 import { padThrow, padSpecial, pushSnapshot, popSnapshot, checkoutLine, HAPTIC } from '/js/core/pad.js';
 import { activePlayer, store, rerender } from '/js/app.js';
 import { cricketMarksTable } from '/js/views/cricket-ui.js';
@@ -268,7 +269,10 @@ function paintGame(view, session) {
 function doThrow(session, t, { rerenderView } = {}) {
   const st = session.state;
   pushSnapshot(session.snapshots, st);
-  clearQueue();
+  // MURMEL-FIX: laufende Ansage zu Ende spielen, nur WARTENDE verwerfen (früher:
+  // clearQueue pausierte mitten im Satz -> abgeschnittene Fragmente = "Gebrabbel").
+  if (session._turnHoldTimer) { clearTimeout(session._turnHoldTimer); session._turnHoldTimer = null; }
+  flushPending();
   buzz(HAPTIC.tap);
 
   const p = st.current;
@@ -307,8 +311,12 @@ function doThrow(session, t, { rerenderView } = {}) {
   if (ev.type === 'turn' || ev.type === 'noin' || ev.type === 'bust' || ev.type === 'leg' || ev.type === 'match') {
     const visit180 = visitPoints === 180 && !ev.type.includes('bust');
     const visitHigh = (visitPoints >= 100 && visitPoints < 180) ? visitPoints : null;
+    // DOPPEL-FIX: bei "Wurfpunkte je Dart" wurden Dart 1+2 schon EINZELN gesagt —
+    // die Visit-Sequenz wiederholt nur noch den LETZEN Dart, dann Rest/Weg. Bei
+    // dartCalls aus: volle Visit-Sequenz mit allen drei Segmenten (Kays Timing).
+    const labels = callerSettings().dartCalls ? session.visitLabels.slice(-1) : session.visitLabels;
     callVisitEnd(st.leg.remaining[p] === 0 && ev.type !== 'match' ? 0 : st.leg.remaining[st.current] ?? restAfter, {
-      forMatch, bust: ev.type === 'bust', visit180, visitHigh, labels: session.visitLabels
+      forMatch, bust: ev.type === 'bust', visit180, visitHigh, labels
     });
     session.visitLabels = [];
   }
@@ -321,7 +329,18 @@ function doThrow(session, t, { rerenderView } = {}) {
   }
   if (ev.type === 'match') { finishSession(session, false, ev); return ev; }
 
-  if (rerenderView) rerenderView();
+  if (rerenderView) {
+    if (ev.type === 'turn' || ev.type === 'noin' || ev.type === 'bust') {
+      // DRITTE ZAHL SICHTBAR (Kays Test): Pills + Visit-Score stehen lassen —
+      // mindestens 1,2 s ODER bis der Caller-Satz fertig ist (was länger ist).
+      const hold = turnHoldMs(callerBusyMs());
+      clearTimeout(session._turnHoldTimer);
+      session._turnHoldTimer = setTimeout(() => { session._turnHoldTimer = null; rerenderView(); }, hold);
+    } else {
+      clearTimeout(session._turnHoldTimer);
+      rerenderView();
+    }
+  }
   return ev;
 }
 

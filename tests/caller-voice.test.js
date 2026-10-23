@@ -164,4 +164,54 @@ describe('Caller-Voice: strikt serielle Play-Engine', () => {
     await m.callerIdle();
     expect(FakeAudio.played.length).toBeLessThanOrEqual(1);
   });
+
+  it('MURMEL-FIX: flushPending lässt den laufenden Clip KOMPLETT enden, flüchtige Calls verfallen', async () => {
+    const m = await loadModule();
+    m.configureCaller({ enabled: true, voiceSet: 'elevenlabs-brian' });
+    m.callDart({ k: 'triple', n: 20, v: 60 });
+    // Kay wirft SOFORT den nächsten Dart (play.js ruft flushPending statt clearQueue)
+    m.flushPending();
+    m.callDart({ k: 'triple', n: 19, v: 57 });
+    await m.callerIdle();
+    // Erster Clip komplett (play + ended), wartender alter Call verworfen, neuer komplett
+    const log = m.callerDebugLog();
+    const plays = log.filter(e => e.ev === 'play').map(e => e.url);
+    const ends = log.filter(e => e.ev === 'ended');
+    expect(plays).toEqual(['seg-t20.mp3', 'seg-t19.mp3']);
+    expect(ends.length).toBe(2);
+    for (const e of ends) expect(e.ms).toBeGreaterThanOrEqual(0); // jeder play hat sein ended
+  });
+
+  it('PRIO: "You require <rest>" überlebt schnelle Würfe (Kays Kernfeature)', async () => {
+    const m = await loadModule();
+    m.configureCaller({ enabled: true, voiceSet: 'elevenlabs-brian' });
+    m.callVisitEnd(361, { labels: ['s20'] }); // Visit-Ende: seg + rest-361 (prio 1)
+    m.flushPending(); // Dart 1 des nächsten Visits
+    m.callDart({ k: 'triple', n: 19, v: 57 });
+    await m.callerIdle();
+    const plays = m.callerDebugLog().filter(e => e.ev === 'play').map(e => e.url);
+    expect(plays).toEqual(['seg-s20.mp3', 'rest-361.mp3', 'seg-t19.mp3']);
+    expect(plays).toContain('rest-361.mp3'); // DER Beweis: Rest-Satz wurde NICHT verschluckt
+  });
+
+  it('PRIO: neues Visit-Ende ersetzt wartende alte Ansagen (nicht 2x rest stapeln)', async () => {
+    const m = await loadModule();
+    m.configureCaller({ enabled: true, voiceSet: 'elevenlabs-brian' });
+    m.callVisitEnd(361, { labels: ['s20'] });
+    m.callVisitEnd(321, { labels: ['s20'] }); // Kay wirft das ganze nächste Visit in Sekunden
+    await m.callerIdle();
+    const plays = m.callerDebugLog().filter(e => e.ev === 'play').map(e => e.url);
+    // play1 = LAUFENDER Clip des ersten Visit-Ends (endet sauber, Murmel-Fix),
+    // danach NUR die neue Sequenz: kein rest-361-Stapel, kein Doppel-Rest
+    expect(plays).toEqual(['seg-s20.mp3', 'seg-s20.mp3', 'rest-321.mp3']);
+  });
+
+  it('callerBusyMs: >0 solange etwas wartet/spielt, 0 wenn idle', async () => {
+    const m = await loadModule();
+    m.configureCaller({ enabled: true, voiceSet: 'elevenlabs-brian' });
+    m.callVisitEnd(361, { labels: ['t20', 't20', 's20'] });
+    expect(m.callerBusyMs()).toBeGreaterThan(0);
+    await m.callerIdle();
+    expect(m.callerBusyMs()).toBe(0);
+  });
 });

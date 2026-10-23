@@ -24,9 +24,9 @@ let queue = [];
 let playing = false;
 let drainWaiters = [];
 
-let settings = { enabled: true, checkout: true, dartCalls: true, lang: 'en', rate: 1.0, voiceURI: null, voiceSet: 'elevenlabs', applause: true };
+let settings = { enabled: true, checkout: true, dartCalls: true, lang: 'en', rate: 1.0, voiceURI: null, voiceSet: 'gemma', applause: true };
 
-export function configureCaller(s) { settings = { ...settings, ...s }; if (!settings.voiceSet) settings.voiceSet = 'elevenlabs'; }
+export function configureCaller(s) { settings = { ...settings, ...s }; if (!settings.voiceSet) settings.voiceSet = 'gemma'; }
 export function callerSettings() { return settings; }
 
 // Stimm-Sets: Verzeichnisse unter /caller/<set>/<lang>/. Manifest liefert die Auswahl;
@@ -76,7 +76,7 @@ function clipCandidatesForId(clipId) {
 
 // GENAU EIN Kandidat je Clip: das gewählte Set. Kein Set-übergreifender Stimm-Mix.
 function clipCandidates(kind, a, b) {
-  return [clipUrlFor(settings.voiceSet || 'elevenlabs', kind, a, b)].filter(Boolean);
+  return [clipUrlFor(settings.voiceSet || 'gemma', kind, a, b)].filter(Boolean);
 }
 const clipUrl = (kind, a, b) => clipCandidates(kind, a, b)[0];
 
@@ -94,19 +94,21 @@ function acquireAudio(url) {
   let a = audioCache.get(url);
   if (a) return a;
   a = sparePool.pop() || newAudioElement(); // Pool-Element = auf iOS schon entsperrt
-  if (!a.__errBound) {
-    a.__errBound = true;
-    a.addEventListener('error', () => { if (a.__loadedUrl) missing.add(a.__loadedUrl); });
-  }
   audioCache.set(url, a);
   evictCache();
   return a;
 }
 
-// URL an ein Element binden (nur bei Wechsel — kein Reload bei Wiederverwendung)
+// URL an ein Element binden (nur bei Wechsel — kein Reload bei Wiederverwendung).
+// Der error-Listener wird PRO URL gescopet: Ein VERSPÄTETER 404-Error eines alten
+// Preloads darf NIE die gerade geladene URL als "missing" markieren (hat exakt die
+// verschwundenen "You require"-Sätze erzeugt — Kays Gebrabbel-Lücken).
 function attachUrl(a, url) {
   if (a.__loadedUrl === url) return false;
+  if (a.__errFn) a.removeEventListener('error', a.__errFn);
   a.__loadedUrl = url;
+  a.__errFn = () => missing.add(url);
+  a.addEventListener('error', a.__errFn);
   try { a.src = url; } catch (e) { /* egal */ }
   return true;
 }
@@ -206,27 +208,50 @@ function speakFallback(text) {
 }
 
 // ---------- Queue (STRIKT seriell: ein Satz, dann Gap, dann der nächste) ----------
-function enqueue(items) {
-  if (!settings.enabled) return;
-  queue.push(...items);
-  if (!playing) drain();
-}
+// enqueue/flushPending stehen unten beim PRIO-MODELL.
+// HART: sofort alles stoppen — nur für Undo/Spielende/Set-Wechsel (niemals im Wurf-Flow!)
 export function clearQueue() {
   queue = [];
   for (const a of audioCache.values()) { try { a.pause(); } catch (e) {} }
+  current = null;
   if (typeof speechSynthesis !== 'undefined') { try { speechSynthesis.cancel(); } catch (e) {} }
   playing = false;
   resolveIdle();
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// ---------- Tracing (Murmel-Diagnose): jede Play-Entscheidung mit Zeit + Dauer ----------
+const dbg = [];
+const now = () => (typeof performance !== 'undefined' ? Math.round(performance.now()) : Date.now());
+function trace(ev, extra = {}) {
+  dbg.push({ t: now(), ev, ...extra });
+  if (dbg.length > 300) dbg.shift();
+}
+export function callerDebugLog() { return dbg.slice(); }
+
+let current = null; // { url, startedAt, durationMs } — laufender Clip für callerBusyMs()
+// Rest-Beschäftigungsdauer der Queue in ms (für "Anzeige halten bis Caller fertig")
+export function callerBusyMs() {
+  let ms = 0;
+  if (current) {
+    const dur = current.durationMs || 1600;
+    ms += Math.max(0, dur - (now() - current.startedAt));
+  }
+  for (const it of queue) {
+    const hasClip = (it.urls && it.urls.length) || !it.text;
+    ms += (it.gapBeforeMs || 0) + (hasClip ? 1400 : 900);
+  }
+  return Math.round(ms);
+}
+
 async function drain() {
   playing = true;
   while (queue.length) {
     const item = queue.shift();
     if (!item) continue;
-    if (item.gapBeforeMs) await sleep(item.gapBeforeMs);
+    if (item.gapBeforeMs) { trace('gap', { ms: item.gapBeforeMs }); await sleep(item.gapBeforeMs); }
     if (settings.voiceSet === DEVICE_SET) {
+      trace('tts', { text: item.text });
       await speakFallback(item.text); // explizites Gerätstimme-Set
       continue;
     }
@@ -249,6 +274,9 @@ export function callerIdle() {
 
 async function playItem(item) {
   const candidates = item.urls || (item.url ? [item.url] : []);
+  // Ein Satz = GENAU EIN Element: falls je ein Element leaket (alter Bug-Pfad),
+  // wird es hier angehalten, bevor der nächste Satz startet. Keine Überlappung.
+  for (const a of audioCache.values()) { if (!a.paused) { try { a.pause(); } catch (e) {} } }
   for (const url of candidates) {
     if (!url || missing.has(url)) continue;
     const a = acquireAudio(url);
@@ -262,28 +290,39 @@ async function playItem(item) {
       let fadeTimer = null;
       let watchdog = null;
       let finished = false;
+      const t0 = now();
+      current = { url, startedAt: t0, durationMs: null };
       const cleanup = () => {
         a.removeEventListener('ended', done); a.removeEventListener('error', err);
         if (fadeTimer) clearInterval(fadeTimer);
         if (watchdog) clearTimeout(watchdog);
       };
-      const finish = (v) => { if (finished) return; finished = true; cleanup(); resolve(v); };
+      const finish = (v) => {
+        if (finished) return;
+        finished = true; cleanup(); resolve(v);
+        trace(v === 'ok' ? 'ended' : v, { url: url.split('/').pop(), ms: now() - t0 });
+        if (current && current.url === url) current = null;
+      };
       const done = () => finish('ok');
       const err = () => { missing.add(url); finish('missing'); };
       a.addEventListener('ended', done);
       a.addEventListener('error', err);
+      trace('play', { url: url.split('/').pop() });
       a.play().then(() => {
+        // Sicherheitsnetz: 'ended' feuert auf manchen Mobil-Browsern nicht zuverlässig.
+        // Bekannte Clip-Dauer (Metadata) + Puffer beendet den Satz sicher — nicht 20s warten.
+        const durMs = (isFinite(a.duration) && a.duration > 0) ? Math.round(a.duration * 1000) : 8000;
+        if (current) current.durationMs = durMs;
+        watchdog = setTimeout(() => finish('ok'), durMs + 900);
         if (item.playMs) {
-          const t0 = Date.now();
+          const t1 = Date.now();
           fadeTimer = setInterval(() => {
-            const left = item.playMs - (Date.now() - t0);
+            const left = item.playMs - (Date.now() - t1);
             if (left <= 300) { a.volume = Math.max(0, (item.volume || 1) * left / 300); }
             if (left <= 0) { clearInterval(fadeTimer); a.pause(); finish('ok'); }
           }, 60);
         }
       }).catch(() => finish('blocked'));
-      // Sicherheitsnetz: falls 'ended' nie feuert (Stream-Falle), Queue nicht blockieren
-      watchdog = setTimeout(() => finish('ok'), 20000);
     });
     if (r === 'ok') return 'ok';
     if (r === 'blocked') return 'blocked';
@@ -320,25 +359,42 @@ function textForClipId(id) {
   return '';
 }
 
-function enqueueSequence(seq) {
+function enqueueSequence(seq, { prio = 1, replace = false } = {}) {
   if (!settings.enabled) return;
-  enqueue(seq.map(s => ({ clipId: s.clipId, urls: clipCandidatesForId(s.clipId), gapBeforeMs: s.gapBeforeMs || 0, volume: s.volume, playMs: s.playMs, text: textForClipId(s.clipId) })));
+  enqueue(seq.map(s => ({ clipId: s.clipId, urls: clipCandidatesForId(s.clipId), gapBeforeMs: s.gapBeforeMs || 0, volume: s.volume, playMs: s.playMs, text: textForClipId(s.clipId), prio })), { replace });
 }
 
 // ---------- High-Level ----------
-// Dart-Call (je Wurf, einzeln mit 220ms Luft via Gap)
+// PRIO-MODELL (Murmel + verschluckte Rest-Sätze):
+//   prio 0 = flüchtig (einzelner Dart-Call) — darf verfallen, wenn Kay schneller
+//            wirft als gesprochen wird.
+//   prio 1 = aktuelle Wahrheit (Visit-Ende mit "You require <rest>", 180, Game Shot,
+//            Bust) — übersteht schnelle Würfe UND ersetzt wartende Ansagen.
+function enqueue(items, { replace = false } = {}) {
+  if (!settings.enabled) return;
+  if (replace) queue.length = 0; // neues Ereignis macht alle wartenden Ansagen obsolet
+  queue.push(...items);
+  trace('enqueue', { n: items.length, replace, ids: items.map(i => i.clipId).join(',') });
+  if (!playing) drain();
+}
+// Wartende FLÜCHTIGE verwerfen; laufender Clip + prio-1 (You require!) bleiben.
+export function flushPending() {
+  queue = queue.filter(i => (i.prio || 1) >= 1);
+  resolveIdle();
+}
+// Dart-Call (je Wurf, einzeln mit 220ms Luft via Gap) — flüchtig
 export function callDart(thr) {
   if (!settings.enabled || !settings.dartCalls) return;
   if (thr.k === 'sum') {
-    enqueueSequence([{ clipId: 'sc-' + thr.v, gapBeforeMs: 220 }]);
+    enqueueSequence([{ clipId: 'sc-' + thr.v, gapBeforeMs: 220 }], { prio: 0 });
     return;
   }
   if (thr.v === 180) { call180(); return; }
   const segCode = thr.k === 'miss' ? 'miss' : thr.k === 'bull' ? 'bull' : thr.k === 'outer' ? '25' : (thr.k[0] + thr.n);
-  enqueueSequence([{ clipId: 'seg-' + segCode, gapBeforeMs: 220 }]);
+  enqueueSequence([{ clipId: 'seg-' + segCode, gapBeforeMs: 220 }], { prio: 0 });
 }
 
-// Visit-Ende: voller require-Satz + Checkout-Weg (Kays Sequenz)
+// Visit-Ende: voller require-Satz + Checkout-Weg (Kays Sequenz) — ersetzt Wartendes
 export function callVisitEnd(rest, { forMatch = false, bust = false, visit180 = false, visitHigh = null, labels = [] } = {}) {
   if (!settings.enabled) return;
   let coId = null;
@@ -350,34 +406,37 @@ export function callVisitEnd(rest, { forMatch = false, bust = false, visit180 = 
         : ('co-' + rest);
     }
   }
-  enqueueSequence(visitSequence({ labels, rest, bust, visit180, visitHigh }, coId));
+  const seq = visitSequence({ labels, rest, bust, visit180, visitHigh }, coId);
+  trace('visitend', { rest, ids: seq.map(s => s.clipId).join(',') });
+  enqueueSequence(seq, { replace: true });
 }
 
 export function call180() {
   if (!settings.enabled) return;
-  enqueueSequence([{ clipId: 'ph-180', gapBeforeMs: 220 }]);
+  enqueueSequence([{ clipId: 'ph-180', gapBeforeMs: 220 }], { replace: true });
 }
 
 export function callVisitHigh(points) {
   if (!settings.enabled) return;
-  enqueueSequence([{ clipId: 'visit-' + points, gapBeforeMs: 220 }]);
+  enqueueSequence([{ clipId: 'visit-' + points, gapBeforeMs: 220 }], { replace: true });
 }
 
+// ---------- High-Level (prio 1, replace) ----------
 export function callBigFish() {
   if (!settings.enabled) return;
-  enqueueSequence([{ clipId: 'ph-bigfish', gapBeforeMs: 220 }]);
+  enqueueSequence([{ clipId: 'ph-bigfish', gapBeforeMs: 220 }], { replace: true });
 }
 
 export function callDoubleRequired(dNumber, forMatch = false) {
   if (!settings.enabled || !settings.checkout) return;
   const code = dNumber === 50 ? 'Bull' : 'D' + dNumber;
   const words = checkoutCallWords(dNumber === 50 ? 50 : dNumber * 2, settings.lang, forMatch ? 'match' : 'plain', false);
-  enqueue([{ urls: clipCandidates('double', code, forMatch ? 'match' : null), text: words || `Double ${dNumber}`, gapBeforeMs: 250 }]);
+  enqueue([{ urls: clipCandidates('double', code, forMatch ? 'match' : null), text: words || `Double ${dNumber}`, gapBeforeMs: 250, prio: 0 }]);
 }
 
 export function callGameShot(legsWonMe = 0, legsWonOpp = 0, matchOver = false) {
   if (!settings.enabled) return;
-  enqueueSequence(endSequence({ matchOver, legsWonMe, legsWonOpp, applause: settings.applause !== false }));
+  enqueueSequence(endSequence({ matchOver, legsWonMe, legsWonOpp, applause: settings.applause !== false }), { replace: true });
 }
 
 export function callBust() {
