@@ -318,12 +318,27 @@ function doThrow(session, t, { rerenderView } = {}) {
   const ev = applyDart(st, t);
   store.save();
 
+
   const restAfter = st.leg.remaining[p];
   const visitDartsNow = st.leg.visit.length;
   const visitPoints = ev.type === 'bust' ? 0 : restBefore - restAfter;
   const segLabel = t.k === 'bull' ? 'bull' : t.k === 'outer' ? '25' : (t.k[0] + t.n);
   session.visitLabels = session.visitLabels || [];
   session.visitLabels.push(segLabel);
+
+  // 3. PILL SOFORT (Kays Hard-Stopp): applyDart leert st.leg.visit beim Turn — ohne
+  // dieses Live-Paint wuerde die 3. Wurfzahl NIE erscheinen (DOM stammt vom Rerender
+  // des Vor-Darts). Zeichne die 3 Pills aus den visitLabels, BEVOR der Hold laeuft.
+  if (rerenderView && (ev.type !== 'ok') && (ev.type !== 'noin')) {
+    try {
+      const vb = document.querySelector('#visitbar');
+      if (vb) {
+        const labels = (session.visitLabels || []).slice(0, 3);
+        vb.innerHTML = '';
+        for (let i = 0; i < 3; i++) vb.append(el('div', { class: 'dartpill' + (labels[i] ? '' : ' empty') }, labels[i] || '·'));
+      }
+    } catch (e) { /* egal */ }
+  }
 
   if (ev.type === 'bust') {
     buzz(HAPTIC.bust);

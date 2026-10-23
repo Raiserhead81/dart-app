@@ -24,9 +24,9 @@ let queue = [];
 let playing = false;
 let drainWaiters = [];
 
-let settings = { enabled: true, checkout: true, dartCalls: true, lang: 'en', rate: 1.0, voiceURI: null, voiceSet: 'gemma', applause: true };
+let settings = { enabled: true, checkout: true, dartCalls: true, lang: 'en', rate: 1.0, voiceURI: null, voiceSet: 'elevenlabs-brian', applause: true };
 
-export function configureCaller(s) { settings = { ...settings, ...s }; if (!settings.voiceSet) settings.voiceSet = 'gemma'; }
+export function configureCaller(s) { settings = { ...settings, ...s }; if (!settings.voiceSet) settings.voiceSet = 'elevenlabs-brian'; }
 export function callerSettings() { return settings; }
 
 // Stimm-Sets: Verzeichnisse unter /caller/<set>/<lang>/. Manifest liefert die Auswahl;
@@ -76,7 +76,7 @@ function clipCandidatesForId(clipId) {
 
 // GENAU EIN Kandidat je Clip: das gewählte Set. Kein Set-übergreifender Stimm-Mix.
 function clipCandidates(kind, a, b) {
-  return [clipUrlFor(settings.voiceSet || 'gemma', kind, a, b)].filter(Boolean);
+  return [clipUrlFor(settings.voiceSet || 'elevenlabs-brian', kind, a, b)].filter(Boolean);
 }
 const clipUrl = (kind, a, b) => clipCandidates(kind, a, b)[0];
 
