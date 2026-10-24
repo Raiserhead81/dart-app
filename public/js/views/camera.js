@@ -91,6 +91,11 @@ export function startAuto(onThrow, onStatus) {
     try {
       const now = frameGrab();
       const p = findeNeuenPfeil(lastFrame, now);
+      // KAY-DIAGNOSE: jede Runde loggen (warum wird nichts gezaehlt?)
+      try {
+        window.__camlog = (window.__camlog || []).slice(-40);
+        window.__camlog.push({ t: Date.now() % 100000, p: p ? [Math.round(p.x), Math.round(p.y), p.pixel + 'px'] : null, cal: cal ? [Math.round(cal.cx), Math.round(cal.cy), Math.round(cal.r)] : 'KEINE' });
+      } catch (e) {}
       if (p && cal) {
         const seg = segVonPixel(p.x, p.y, cal);
         const selbeStelle = pending && Math.abs(pending.x - p.x) < 18 && Math.abs(pending.y - p.y) < 18;
