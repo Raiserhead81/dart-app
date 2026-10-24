@@ -185,13 +185,17 @@ export function mountCam(host, onThrow, onStatus) {
   const phase = { m: 'idle' };
   v.onclick = async (ev) => {
     if (phase.m !== 'kalib') return;
-    const r = v.getBoundingClientRect();
-    // object-fit: CONTAIN -> sichtbarer Video-Bereich innerhalb des Elements
-    const sc = Math.min(r.width / (v.videoWidth || r.width), r.height / (v.videoHeight || r.height));
-    const offX = (r.width - (v.videoWidth || r.width) * sc) / 2;
-    const offY = (r.height - (v.videoHeight || r.height) * sc) / 2;
-    const px = (ev.clientX - r.left - offX) / sc;
-    const py = (ev.clientY - r.top - offY) / sc;
+    // ZOOM-SICHER (wie tapEingabe): offset-Masse + entzoomen vor contain-Mapping
+    const ow = v.offsetWidth || v.videoWidth, oh = v.offsetHeight || v.videoHeight;
+    const rect = v.getBoundingClientRect();
+    const zoom = v.style.transform ? (parseFloat(v.style.transform.replace(/[^\d.]/g, '')) || 1) : 1;
+    const lx = (ev.clientX - rect.left) / zoom;
+    const ly = (ev.clientY - rect.top) / zoom;
+    const sc = Math.min(ow / (v.videoWidth || ow), oh / (v.videoHeight || oh));
+    const offX = (ow - (v.videoWidth || ow) * sc) / 2;
+    const offY = (oh - (v.videoHeight || oh) * sc) / 2;
+    const px = (lx - offX) / sc;
+    const py = (ly - offY) / sc;
     if (!cal) { cal = { cx: px, cy: py, r: 100 }; note.textContent = 'Jetzt UNTERE Doppel-Aussenseite antippen'; }
     else if (cal.r === 100 && py !== cal.cy) {
       cal.r = Math.abs(py - cal.cy);
