@@ -642,6 +642,55 @@ function zeichneBoardOverlay(videoEl, cal) {
   window.__boardRedraw = () => { try { zeichneBoardOverlay(v, camCalRef()); } catch (e) {} };
 }
 
+
+// KAY: Kamerabereich KOMPLETT (vom Spielstart UND vom Kamera-Button im laufenden Spiel)
+function baueKameraBereich(session, view) {
+  const h = document.getElementById('camhost') || (() => {
+    const hh = el('div', { id: 'camhost', style: 'position:fixed;top:0;left:0;right:0;height:55vh;z-index:30;background:#070b09;padding:6px 8px 4px;box-sizing:border-box' });
+    document.body.append(hh);
+    const vg = document.querySelector('.view-game');
+    if (vg) { vg.style.paddingTop = 'calc(55vh + 10px)'; vg.style.minHeight = '0'; vg.style.height = 'auto'; }
+    return hh;
+  })();
+  if (h.dataset.komplett !== '1') {
+    h.dataset.komplett = '1';
+    const camHinweis = el('div', { style: 'position:absolute;bottom:64px;left:50%;transform:translateX(-50%);background:rgba(7,11,9,.92);border:1px solid var(--green);padding:10px 22px;border-radius:12px;font-size:16px;font-weight:900;color:#fff;z-index:5;letter-spacing:.04em;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.6);animation:camPulse 1.2s ease-in-out infinite' }, '👆 TIPP JETZT auf deinen Treffer');
+    const kalibBtn = el('button', { class: 'btn primary', style: 'position:absolute;bottom:10px;left:50%;transform:translateX(-50%);z-index:5;min-height:40px;padding:8px 18px' }, '① SCHEIBE KALIBRIEREN');
+    kalibBtn.onclick = async () => {
+      kalibBtn.textContent = 'Kalibriere… (Scheibe frei lassen)';
+      kalibBtn.disabled = true;
+      const v = document.querySelector('#camhost video');
+      const { autoKalibriere } = await import('/js/views/camera.js');
+      const erg = v ? await autoKalibriere(v) : null;
+      kalibBtn.disabled = false;
+      if (erg) {
+        setCal(erg); saveCal();
+        kalibBtn.textContent = '✓ Kalibriert (R=' + Math.round(erg.r) + 'px) - nochmal';
+        camHinweis.textContent = 'KALIBRIERT ✓ - wirf und tippe deine Treffer';
+        zeichneBoardOverlay(v, erg);
+        setTimeout(() => { kalibBtn.textContent = 'Scheibe neu kalibrieren'; }, 2500);
+      } else {
+        kalibBtn.textContent = 'Nicht gefunden - nochmal (Licht prüfen)';
+      }
+    };
+    h.append(camHinweis, kalibBtn);
+    setTimeout(() => {
+      const v = document.querySelector('#camhost video');
+      if (v) {
+        tapEingabeAnbinden(v, (seg) => {
+          firePad(session, view, () => makeThrow(seg.k === 'outer' ? 'outer' : seg.k, seg.n));
+          camHinweis.textContent = '✓ ' + seg.label + ' GESPEICHERT';
+          camHinweis.style.animation = 'none';
+          camHinweis.style.borderColor = 'var(--gold)';
+          setTimeout(() => { camHinweis.textContent = '👆 TIPP JETZT auf deinen Treffer'; camHinweis.style.animation = ''; camHinweis.style.borderColor = 'var(--green)'; }, 1300);
+        }, () => { camHinweis.textContent = 'KALIBRIEREN: Button unten drücken'; });
+        if (camCalRef()) zeichneBoardOverlay(v, camCalRef());
+      }
+    }, 900);
+  }
+  return h;
+}
+
 function endEarly() {
   const session = store.state.session;
   if (session) finishSession(session, true); // KAY: direkt beenden (confirm-Dialog zickt in der WebView)
