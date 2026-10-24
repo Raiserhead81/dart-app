@@ -52,7 +52,7 @@ function renderSetup(view) {
     }
   }, String(s)));
 
-  const ftLabel = el('div', { class: 'small muted mt', style: 'margin:0 0 -6px' },
+  const ftLabel = el('div', { class: 'small muted mt', style: 'margin:0 0 6px' },
     sel.setsTo > 0 ? 'Legs pro Satz (Set)' : 'Legs fürs ganze Match (First to)');
   const ftChips = [1, 2, 3, 5].map(n => el('button', {
     class: 'chip' + (n === sel.firstTo ? ' on' : ''), onclick: (e) => {
@@ -64,7 +64,7 @@ function renderSetup(view) {
 
   // KAY-NEU: Sätze konfigurierbar — Best of N oder nur Legs (Default)
   sel.setsTo = store.state.settings.lastSetsTo || 0;
-  const setsLabel = el('div', { class: 'small muted mt', style: 'margin:0 0 -6px' }, 'Sätze');
+  const setsLabel = el('div', { class: 'small muted mt', style: 'margin:0 0 6px' }, 'Sätze');
   const setChips = [0, 3, 5, 7].map(n => el('button', {
     class: 'chip' + (sel.setsTo === n ? ' on' : ''), onclick: (e) => {
       sel.setsTo = n;
