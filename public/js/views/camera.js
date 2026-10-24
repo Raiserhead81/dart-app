@@ -184,7 +184,7 @@ export function mountCam(host, onThrow, onStatus) {
   video = v; // Modul-Referenz fuer frameGrab/startAuto
   const phase = { m: 'idle' };
   v.onclick = async (ev) => {
-    if (phase.m !== 'kalib') return;
+    if (phase.m !== 'kalib' && phase.m !== 'kalib-check') return;
     // ZOOM-SICHER (wie tapEingabe): offset-Masse + entzoomen vor contain-Mapping
     const ow = v.offsetWidth || v.videoWidth, oh = v.offsetHeight || v.videoHeight;
     const rect = v.getBoundingClientRect();
@@ -200,7 +200,16 @@ export function mountCam(host, onThrow, onStatus) {
     else if (cal.r === 100 && py !== cal.cy) {
       cal.r = Math.abs(py - cal.cy);
       saveCal();
-      note.textContent = 'Kalibriert! Kamera zaehlt jetzt selbst mit.';
+      // KAY-FEINTUNING: Kontroll-Tipp aufs BULL => systematischer Versatz wird wegkorrigiert
+      cal._check = true;
+      note.textContent = 'FAST FERTIG: Tipp nochmal MITTLIG aufs BULL (Kontrolle)';
+      phase.m = 'kalib-check';
+    }
+    else if (phase.m === 'kalib-check') {
+      const versatzX = cal.cx - px, versatzY = cal.cy - py;
+      cal.cx += versatzX; cal.cy += versatzY;
+      saveCal();
+      note.textContent = 'Feinjustiert (±' + Math.round(Math.hypot(versatzX, versatzY)) + 'px) - fertig!';
       phase.m = 'run';
       startAuto(onThrow, onStatus);
     }
