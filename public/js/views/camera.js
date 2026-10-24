@@ -129,7 +129,7 @@ export function camCal() { return cal; }
 // SPIEL-EINBAU: Kamera-PiP in beliebigem Host-Element + Auto-Zaehlung.
 // onThrow(seg) wird bei jedem erkannten Dart gerufen. Kalibrierung per Tap aufs PiP.
 export function mountCam(host, onThrow, onStatus) {
-  const v = el('video', { autoplay: '', playsinline: '', muted: '', style: 'width:100%;max-width:340px;border-radius:12px;background:#000;display:block;margin:0 auto' });
+  const v = el('video', { autoplay: '', playsinline: '', muted: '', style: 'width:100%;max-width:150px;border-radius:12px;background:#000;display:block;margin:0 auto' });
   const note = el('div', { class: 'small muted', style: 'text-align:center;margin-top:4px' }, 'Kamera startet…');
   host.append(v, note);
   video = v; // Modul-Referenz fuer frameGrab/startAuto
