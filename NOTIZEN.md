@@ -29,3 +29,21 @@
 - OFFEN: echte Erkennungs-Quote an Kays Scheibe messen (10 Darts), Schwellwerte tunen
 - Kay-Regeln: ERST selbst via WebView-CDP testen (volltest-Muster), Screenshots nur bei
   wachem Display (wake+Pixelcheck), keine Toggle-Zombie-Zustaende raten
+
+## Kamera-Assistent FINALER STAND (24.10., Abend - Session beendet auf Kays Wunsch)
+- WAS GEHT: Vollbild-Kamera im Spiel (fixed 55vh), Weitwinkel-Linse (camera 4, per
+  Label in localStorage 'dartpro.camera.lenslabel' gespeichert, Oppo deviceIds wechseln!),
+  Zoom-Slider 0,3-5x (Start 0,5x weit), Rec-Aufnahme in IndexedDB, Beenden-Button direkt,
+  Kamera stoppt sauber beim Spielende, Linsen-Auswahl im Kamera-Assistent
+- ENGINE v4 (src/camera-engine.js): Spitze = oberes Blob-Drittel (Pfeile haengen nach
+  unten), 8 Unit-Tests gruen - aber NOCH NICHT an echter Scheibe verifiziert!
+- SCHEIBE GEMESSEN (aus Kays Video, glm-Analyse): Steel-Board!, Mitte ~(53-56%/44-47%),
+  Radius ~22-30% Breite. E-Dart-Vermutung war FALSCH - Kay spielt STEEL.
+- MEDIA-RECORDER-Videos sind KAPUTT ("File ended prematurely", Cluster-Rettung scheitert)
+  => DEAD END, nicht weiter verfolgen!
+- NAechster Schritt (frische Session!): LIVE-FRAMES statt Video: App offen + Kamera an,
+  via CDP canvas.drawImage(video) -> toDataURL -> volle Aufloesung. Pfeile drin/raus =
+  2 Frames => Kalibrierung pixelgenau => Engine an echten Pfeilen verifizieren/tunen.
+  Kay-Zitat Ablauf: er sagt "jetzt", Frame ziehen. Display muss AN sein (sonst schwarz).
+- Kays Regeln heute gelernt: ERST selbst messen/beweisen dann Kay (Screenshot-Routine mit
+  wake+PIL-check), keine Toggle-Verwirrung, Beenden ohne Rueckfrage, Kabel nur zum Uebertragen
