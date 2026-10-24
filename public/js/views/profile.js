@@ -60,6 +60,11 @@ export function renderProfile(view) {
         } catch (e) {
           status.textContent = 'FEHLER: ' + e.message;
         }
+        // Zoom-Regler (rein/raus) unter dem Kamerabild
+        const zoomLabel = el('span', { class: 'small muted', style: 'float:right' }, '1,0x');
+        const zoom = el('input', { type: 'range', min: 30, max: 500, value: 100, step: 5, style: 'width:100%;margin:8px 0 0' });
+        zoom.oninput = () => { v.style.transform = `scale(${zoom.value / 100})`; zoomLabel.textContent = (zoom.value / 100).toFixed(1).replace('.', ',') + 'x'; };
+        videoHost.append(el('div', {}, zoomLabel), zoom);
         // Manuelle Kalibrier-Taps (falls Auto versagt): Bull, dann untere Doppelkante
         v.onclick = async (ev) => {
           if (phase !== 'kalib-bull' && phase !== 'kalib-rand') return;
