@@ -11,7 +11,7 @@ function baueBoard(W, H, cx, cy, r, dunkelFaktor = 1, rauschen = 0, rotGrad = 0)
     for (let x = 0; x < W; x++) {
       const dx = x - cx, dy = y - cy;
       const rr = Math.hypot(dx, dy) / r;
-      let ang = Math.atan2(dx, -dy) * 180 / Math.PI - rotGrad; if (ang < 0) ang += 360; if (ang >= 360) ang -= 360;
+      let ang = Math.atan2(dx, -dy) * 180 / Math.PI + rotGrad; if (ang < 0) ang += 360; if (ang >= 360) ang -= 360; if (ang >= 360) ang -= 360;
       const idx = Math.round(ang / 18) % 20;
       const zahl = SEKTOREN[idx];
       const istRotSektor = [20, 18, 13, 10, 2, 3, 7, 8, 14, 12].includes(zahl);
