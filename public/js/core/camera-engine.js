@@ -75,10 +75,24 @@ export function normalisiereFrame(D) {
 
 export function analyseBoardInFrame(img) {
   const W = img.width, H = img.height, D = img.data;
+  // NACH TU-WIEN-BACHELORARBEIT (zor-cell/dart-tracking): SEKTOREN IN HSV
+  // erkennen — Farbton (Hue) ist unempfindlich gegen Dunkelheit/Weissabgleich.
+  const rgb2hsv = (r, g, b) => {
+    r /= 255; g /= 255; b /= 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    let h = 0;
+    if (d > 0.001) {
+      if (mx === r) h = 60 * (((g - b) / d) % 6);
+      else if (mx === g) h = 60 * ((b - r) / d + 2);
+      else h = 60 * ((r - g) / d + 4);
+      if (h < 0) h += 360;
+    }
+    const s = mx > 0.001 ? d / mx : 0;
+    return [h, s, mx];
+  };
   const { maxR, maxG, maxB } = normalisiereFrame(D);
-  const norm = (v, max) => Math.min(255, v * 255 / max);
-  const istRotPx = (r, g, b) => norm(r, maxR) > 45 && norm(r, maxR) > norm(g, maxG) * 1.3 && norm(r, maxR) > norm(b, maxB) * 1.3;
-  const istGruenPx = (r, g, b) => norm(g, maxG) > 38 && norm(g, maxG) > norm(r, maxR) * 1.25 && norm(g, maxG) > norm(b, maxB) * 1.12;
+  const istRotPx = (r, g, b) => { const [h, sv, vv] = rgb2hsv(r * 255 / maxR, g * 255 / maxG, b * 255 / maxB); return (h < 25 || h > 335) && sv > 0.32 && vv > 0.18; };
+  const istGruenPx = (r, g, b) => { const [h, sv, vv] = rgb2hsv(r * 255 / maxR, g * 255 / maxG, b * 255 / maxB); return h > 80 && h < 165 && sv > 0.25 && vv > 0.15; };
   const punkte = [];
   let sx = 0, sy = 0, n = 0;
   for (let y = 2; y < H - 2; y += 2) {
