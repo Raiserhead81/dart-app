@@ -88,6 +88,14 @@ button { font: inherit; }
    ueberlappen Pills/Pad-Buttons (dartpill x padmode-Overlap). */
 .view-game > *, .pad > *, .scorecards > *, .gtop, .visitbar, .checkout-banner { flex-shrink: 0; }
 
+/* KAY: Im SPIEL ist die Bottom-Rail deaktiviert — die unteren Zahlentasten lagen
+   direkt darueber, Fehl-Tipps sprangen zur Statistik (wirkte wie Absturz).
+   Alles Steuernde steckt im Pad/gtop. */
+.app:has(.view-game) .rail { display: none; }
+@media (max-width: 939px) {
+  .view-game { min-height: calc(100dvh - 40px); padding-bottom: 12px; overflow: hidden; }
+}
+
 /* KAY: Start-/Setup-Seite kompakt — der 'Spiel starten'-Button muss ohne Scrollen
    erreichbar sein (Kay-Feedback: 'kein button da'). */
 @media (max-width: 939px) {
@@ -436,3 +444,32 @@ button.listitem strong { color: var(--cream); }
   .padkey { min-height: min(32px, 10vh); font-size: 14.5px; border-radius: 8px; }
   .padspecial { gap: 4px; }
   .padspecial .padkey { min-height: min(28px, 9vh); font-size: 12px; }
+
+/* ===== EPISTAT (KAY 24.10.): Statistik im TV-Broadcast-Look des Spielscreens ===== */
+.stathero {
+  position: relative; overflow: hidden;
+  background:
+    radial-gradient(120% 140% at 85% -20%, rgba(192, 57, 43, .18), transparent 55%),
+    linear-gradient(180deg, #141923 0%, #1A202C 55%, #12161F 100%);
+  border: 1px solid rgba(255, 255, 255, .09);
+  box-shadow: 0 22px 55px rgba(0, 0, 0, .6), inset 0 1px 0 rgba(255, 255, 255, .06);
+}
+.stathero::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: repeating-linear-gradient(0deg, transparent 0 3px, rgba(255, 255, 255, .014) 3px 4px); }
+.stathero-name { font-size: clamp(24px, 7vw, 34px); text-transform: uppercase; letter-spacing: -.015em; line-height: 1.05; }
+.hero-num { letter-spacing: -.02em; text-shadow: 0 2px 0 rgba(0, 0, 0, .4), 0 0 34px rgba(255, 255, 255, .14); }
+.hero-kpi.red .hero-num { text-shadow: 0 0 30px rgba(192, 57, 43, .55), 0 2px 0 rgba(0, 0, 0, .4); }
+.hero-kpi.gold .hero-num { text-shadow: 0 0 30px rgba(217, 164, 65, .5), 0 2px 0 rgba(0, 0, 0, .4); }
+.hero-kpi { backdrop-filter: blur(2px); }
+.hero-sub { letter-spacing: .2em; }
+/* Enge Mini-Kacheln: auf schmalen Phones 2x2 statt 4 gequetscht */
+@media (max-width: 420px) {
+  .herominis { grid-template-columns: repeat(2, 1fr); }
+  .heromini .v { font-size: 26px; }
+}
+/* Rekorde: Broadcast-Balken mit Gold-Kante */
+.recordsec { border-left: 4px solid #d9a441; }
+.reckpi .v { text-shadow: 0 0 22px rgba(217, 164, 65, .4); }
+.darkpanel h2, .recordsec .kick { text-transform: uppercase; letter-spacing: .12em; }
+/* Zahlen ueberall tabellarisch */
+.kpi .value, .hero-num, .heromini .v, .reckpi .v, .bench-value { font-variant-numeric: tabular-nums; }
