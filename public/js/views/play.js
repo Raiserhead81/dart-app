@@ -565,7 +565,7 @@ function undo(session) {
 
 function endEarly() {
   const session = store.state.session;
-  if (session && confirm('Spiel beenden und werten?')) finishSession(session, true);
+  if (session) finishSession(session, true); // KAY: direkt beenden (confirm-Dialog zickt in der WebView)
 }
 
 /* ---- Abschluss ---- */

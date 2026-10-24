@@ -166,6 +166,11 @@ export function mountCam(host, onThrow, onStatus) {
 export function unmountCam() {
   stopAuto();
   stopCam();
+  // KAY: Kamerabereich KOMPLETT entfernen (bleib sonst als schwarzer Kasten stehen)
+  const h = document.getElementById('camhost');
+  if (h) h.remove();
+  const vg = document.querySelector('.view-game');
+  if (vg) vg.style.paddingTop = '';
 }
 
 export function renderCamera(view) {
