@@ -124,7 +124,7 @@ export function istKalibriert() { return !!cal; }
 
 // AUTO-MODUS: pollt Frames, findet NEUE Pfeile (stabil = 2 Treffer gleiche Stelle),
 // ruft onThrow(seg) und aktualisiert das Referenzbild. stopAuto() beendet.
-let autoTimer = null, autoBusy = false;
+let autoTimer = null, autoBusy = false, bounces = 0;
 export function startAuto(onThrow, onStatus) {
   if (autoTimer || !stream) return;
   let lastFrame = frameGrab();
@@ -148,11 +148,26 @@ export function startAuto(onThrow, onStatus) {
           onThrow(seg);
           lastFrame = frameGrab();
           pending = null;
+          bounces = 0;
         } else {
           pending = { x: p.x, y: p.y, count: selbeStelle ? pending.count + 1 : 0 };
+          bounces = 0;
         }
       } else if (!p) {
-        pending = null;
+        // KAY/OMNI: BOUNCE-OUT-SCHUTZ - Pfeil war kurz sichtbar (pending gesetzt)
+        // und ist WIEDER VERSCHWUNDEN => Bounce-Out, NICHT werten.
+        if (pending && pending.count >= 1) {
+          bounces++;
+          if (bounces >= 2) {
+            if (onStatus) onStatus('bounce');
+            lastFrame = frameGrab(); // Referenz erneuern, ohne zu werten
+            pending = null;
+            bounces = 0;
+          }
+        } else {
+          pending = null;
+          bounces = 0;
+        }
       }
     } catch (e) { /* Frame-Drop */ }
     autoBusy = false;
