@@ -35,13 +35,16 @@ export async function startCam() {
     });
     // KAY: ECHTEN Kamera-Zoom auf MAXIMAL WEIT (Weitwinkel) stellen - breitester
     // Ausschnitt, die Scheibe mit Umfeld. Der Slider zoomt spaet NUR die Ansicht.
+    let weitwinkelOk = false;
     try {
       const track = stream.getVideoTracks()[0];
       const caps = track.getCapabilities ? track.getCapabilities() : {};
       if (caps.zoom && caps.zoom.min != null) {
         await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min }] });
+        weitwinkelOk = (track.getSettings().zoom || caps.zoom.min) <= caps.zoom.min + 0.01;
       }
-    } catch (e) { /* Geraet ohne Zoom-Control: egal */ }
+    } catch (e) { /* Geraet ohne Zoom-Control */ }
+    stream._weitwinkelOk = weitwinkelOk;
     video.srcObject = stream;
     await video.play();
     return true;
@@ -116,6 +119,10 @@ export function mountCam(host, onThrow, onStatus) {
   zoom.oninput = () => { v.style.transform = `scale(${zoom.value / 100})`; zoomLabel.textContent = (zoom.value / 100).toFixed(1).replace('.', ',') + 'x'; };
   const note = el('div', { class: 'small muted', style: 'text-align:center;margin-top:2px;font-size:10.5px;line-height:1.25' }, 'Kamera startet…');
   frame.append(v);
+  // Ohne echten Weitwinkel (Geraet ignoriert Zoom-Constraint): Ansicht weiter draussen starten
+  if (stream && stream._weitwinkelOk === false) {
+    zoom.value = 70; zoomLabel.textContent = '0,7x'; v.style.transform = 'scale(0.7)';
+  }
   const zoomRow = el('div', {}, zoomLabel);
   host.append(frame, zoomRow, zoom, note);
   video = v; // Modul-Referenz fuer frameGrab/startAuto
