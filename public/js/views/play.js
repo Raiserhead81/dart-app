@@ -187,7 +187,14 @@ function renderX01Game(view) {
       session.useCamera = !session.useCamera;
       store.save();
       if (session.useCamera) {
-        const host = document.getElementById('camhost') || (() => { const h = el('div', { id: 'camhost', style: 'position:fixed;top:8px;right:8px;width:150px;z-index:50' }); document.body.append(h); return h; })();
+        const host = document.getElementById('camhost') || (() => {
+          const h = el('div', { id: 'camhost', style: 'position:fixed;top:8px;right:8px;width:150px;z-index:50' });
+          document.body.append(h);
+          const z = el('input', { type: 'range', min: 100, max: 400, value: 100, style: 'width:100%;margin-top:2px' });
+          z.oninput = () => { const v = h.querySelector('video'); if (v) { v.style.transform = `scale(${z.value / 100})`; v.style.transformOrigin = 'center'; } };
+          h.append(z);
+          return h;
+        })();
         mountCam(host, (seg) => {
           const korrektur = el('div', { style: 'position:fixed;left:50%;transform:translateX(-50%);bottom:86px;z-index:60;background:var(--red-deep);border:1px solid var(--red);border-radius:12px;padding:10px 16px;font-weight:900;font-size:14px;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.5)' },
             el('span', {}, `${seg.label} GEZÄHLT — falsch? `),

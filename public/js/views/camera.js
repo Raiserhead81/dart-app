@@ -41,23 +41,28 @@ function frameGrab() {
 export function findeNeuenPfeil(a, b) {
   if (!a || !b || a.width !== b.width) return null;
   const A = a.data, B = b.data;
-  let bestX = -1, bestY = -1, bestScore = 0;
-  const step = 3; //Pixel-Raster
-  const minR = cal ? cal.r * 0.02 : 5;
-  for (let y = 0; y < a.height; y += step) {
-    for (let x = 0; x < a.width; x += step) {
-      const i = (y * a.width + x) * 4;
+  // KAY v2: Schwerpunkt ALLER stark-veraenderten Pixel im Umkreis der Scheibe
+  // (der Flight lockt den alten single-dark-pixel Algorithmus in die Irre)
+  let sumW = 0, sumX = 0, sumY = 0, n = 0, maxD = 0;
+  const step = 2;
+  const c = cal || { cx: a.width / 2, cy: a.height / 2, r: Math.min(a.width, a.height) / 2 };
+  const minX = Math.max(0, c.cx - c.r * 1.25), maxX = Math.min(a.width, c.cx + c.r * 1.25);
+  const minY = Math.max(0, c.cy - c.r * 1.25), maxY = Math.min(a.height, c.cy + c.r * 1.25);
+  for (let y = minY; y < maxY; y += step) {
+    for (let x = minX; x < maxX; x += step) {
+      const i = (Math.round(y) * a.width + Math.round(x)) * 4;
       const dA = A[i] + A[i + 1] + A[i + 2];
       const dB = B[i] + B[i + 1] + B[i + 2];
-      const dunkler = dA - dB; // neuer Pfeil macht Pixel dunkler
-      if (dunkler > 140) {
-        const score = dunkler;
-        if (score > bestScore) { bestScore = score; bestX = x; bestY = y; }
+      const dunkler = dA - dB;
+      if (dunkler > 120) {
+        const w = dunkler * dunkler;
+        sumW += w; sumX += x * w; sumY += y * w; n++;
+        if (dunkler > maxD) maxD = dunkler;
       }
     }
   }
-  if (bestX < 0 || bestScore < 160) return null;
-  return { x: bestX, y: bestY, staerke: bestScore };
+  if (n < 6 || maxD < 150) return null;
+  return { x: sumX / sumW, y: sumY / sumW, staerke: maxD, pixel: n };
 }
 
 export async function startCam() {
