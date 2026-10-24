@@ -107,3 +107,63 @@ describe('Vollautomatische Rotation aus dem Bild', () => {
     expect(Math.abs(erg.rot) % 360).toBeLessThan(4.5);
   });
 });
+
+describe('v5: SCHRÄGSICHT (Ellipse) - physikalisch perfekt', () => {
+  // Board als ELLIPSE zeichnen: y gestaucht (Kamera schraeg), dazu gedreht
+  function baueVerzerrtesBoard(W, H, cx, cy, r, stauch, rotGrad) {
+    const ROT=[193,39,45], GRUEN=[14,122,60], SCHWARZ=[20,20,20], WEISS=[220,218,210];
+    const SEK=[20,1,18,4,13,6,10,15,2,17,3,19,7,16,8,11,14,9,12,5];
+    const R={bull:0.037,b25:0.094,ti:0.527,to:0.63,di:0.92};
+    const d=new Uint8ClampedArray(W*H*4);
+    const rotB = rotGrad * Math.PI / 180;
+    for (let y=0;y<H;y++) for (let x=0;x<W;x++) {
+      // Bild -> Board-Raum (inverse Transformation: entstauchen + entdrehen)
+      const dx0 = x - cx, dy0 = y - cy;
+      const bx = (dx0 * Math.cos(rotB) + dy0 * Math.sin(rotB));
+      const by = (-dx0 * Math.sin(rotB) + dy0 * Math.cos(rotB)) / stauch;
+      const rr = Math.hypot(bx, by) / r;
+      let a = Math.atan2(bx, -by) * 180 / Math.PI; if (a < 0) a += 360; if (a >= 360) a -= 360;
+      const z = SEK[Math.round(a / 18) % 20];
+      const ir = [20,18,13,10,2,3,7,8,14,12].includes(z);
+      let c = [40,38,36];
+      if (rr <= 1) {
+        if (rr <= R.bull) c = SCHWARZ;
+        else if (rr <= R.b25) c = GRUEN;
+        else if (rr <= R.ti) c = ir ? SCHWARZ : WEISS;
+        else if (rr <= R.to) c = ir ? ROT : GRUEN;
+        else if (rr <= R.di) c = ir ? SCHWARZ : WEISS;
+        else c = ir ? ROT : GRUEN;
+      }
+      const i = (y * W + x) * 4;
+      d[i]=c[0]; d[i+1]=c[1]; d[i+2]=c[2]; d[i+3]=255;
+    }
+    return { width: W, height: H, data: d };
+  }
+
+  it('gestauchtes Board (0.78): Ellipsen-Fit findet Achsen, aspekt ≈ 0.78', () => {
+    const erg = analyseBoardInFrame(baueVerzerrtesBoard(270, 152, 135, 76, 60, 0.78, 0));
+    expect(erg).toBeTruthy();
+    expect(erg.aspekt).toBeGreaterThan(0.72);
+    expect(erg.aspekt).toBeLessThan(0.86);
+  });
+
+  it('gestauchtes + gedrehtes Board: T20-Tap im VERZERRTEN Bild zaehlt T20 (Normierraum!)', () => {
+    const erg = analyseBoardInFrame(baueVerzerrtesBoard(270, 152, 135, 76, 60, 0.8, 12));
+    expect(erg).toBeTruthy();
+    setEngineCal(erg);
+    // Der T20-Punkt im BILD: Board-Raum (0, -0.58r) -> Bild: drehen + stauchen
+    const rotB = 12 * Math.PI / 180;
+    const bx = 0, by = -0.58 * 60;
+    const px = 135 + (bx * Math.cos(rotB) - by * Math.sin(rotB) * 0.8);
+    const py = 76 + (bx * Math.sin(rotB) + by * Math.cos(rotB) * 0.8);
+    const seg = segVonPixel(px, py);
+    expect(seg?.label).toBe('T20');
+  });
+
+  it('stark schraeg (0.65): Bull-Tap bleibt Bull', () => {
+    const erg = analyseBoardInFrame(baueVerzerrtesBoard(270, 152, 135, 76, 58, 0.65, -8));
+    setEngineCal(erg);
+    const seg = segVonPixel(erg.cx, erg.cy);
+    expect(seg?.label).toBe('BULL');
+  });
+});

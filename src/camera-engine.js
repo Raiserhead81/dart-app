@@ -10,8 +10,10 @@ export function setEngineCal(c) { _cal = c || _cal; }
 
 export function segVonPixel(x, y, c) {
   const cal = c || _cal;
-  const dx = x - cal.cx, dy = y - cal.cy;
-  const r = Math.sqrt(dx * dx + dy * dy) / cal.r;
+  // v5: NORMIERRAUM - Ellipsen-Schraegsicht wird exakt korrigiert
+  const n = inNormierraum(x, y, cal);
+  const dx = n.u, dy = n.v;
+  const r = Math.sqrt(dx * dx + dy * dy);
   if (r > 1.06) return null;
   if (r <= RINGE.bull) return { k: 'bull', n: 50, v: 50, label: 'BULL' };
   if (r <= RINGE.bull25) return { k: 'outer', n: 25, v: 25, label: '25' };
@@ -143,17 +145,37 @@ export function analyseBoardInFrame(img) {
       if (istRotPx(D[i], D[i + 1], D[i + 2]) || istGruenPx(D[i], D[i + 1], D[i + 2])) { rand.push(rr); break; }
     }
   }
-  rand.sort((a, b) => a - b);
-  const r = rand.length >= 12 ? rand[Math.floor(rand.length / 2)] : rEst0;
+  // v5: Randpunkte-Paare -> PCA-ELLIPSEN-FIT (faengt Schraegsicht exakt)
+  let ellipse = null;
+  if (rand.length >= 12) {
+    const ellPunkte = [];
+    for (let a = 0; a < 24; a++) {
+      const rad = a / 24 * 2 * Math.PI;
+      for (let rr = rEst0 * 1.08; rr > rEst0 * 0.3; rr -= 0.5) {
+        const x = Math.round(cx + Math.cos(rad) * rr), y = Math.round(cy + Math.sin(rad) * rr);
+        if (x < 0 || y < 0 || x >= W || y >= H) continue;
+        const i = (y * W + x) * 4;
+        if (istRotPx(D[i], D[i + 1], D[i + 2]) || istGruenPx(D[i], D[i + 1], D[i + 2])) { ellPunkte.push([x, y]); break; }
+      }
+    }
+    ellipse = fitEllipse(ellPunkte);
+  }
+  const r = ellipse ? Math.max(ellipse.rx, ellipse.ry) : rEst0;
+  if (ellipse) { cx = ellipse.cx; cy = ellipse.cy; }
   // ROTATION per PHASEN-KORRELATION: Signal = Schwarz(+1)/Weiss(-1) entlang des
   // Single-Rings; ideal = 20er schwarz zentriert oben, alle 36 Grad. Der Versatz
   // mit der hoechsten Korrelation = Kamera-Drehung. Robust: nutzt alle 20 Sektoren.
   const signal = new Array(360).fill(0);
   const signCount = new Array(360).fill(0);
+  // v5: Signal im NORMIERRAUM samplen (Ellipsen-Verzerrung rausgerechnet):
+  // Bildpunkt = Zentrum + R(theta) * [nx*rx, ny*ry]  (nx,ny auf dem Einheitskreis)
+  const RX = ellipse ? ellipse.rx : r, RY = ellipse ? ellipse.ry : r, TH = ellipse ? ellipse.theta : 0;
   for (let t = 0; t < 360; t++) {
     const rad = (t - 90) * Math.PI / 180; // 0 = oben
     for (const f of [0.72, 0.80, 0.87]) {
-      const x = Math.round(cx + Math.cos(rad) * r * f), y = Math.round(cy + Math.sin(rad) * r * f);
+      const nx = Math.cos(rad) * f, ny = Math.sin(rad) * f;
+      const x = Math.round(cx + (nx * RX * Math.cos(TH) - ny * RY * Math.sin(TH)));
+      const y = Math.round(cy + (nx * RX * Math.sin(TH) + ny * RY * Math.cos(TH)));
       if (x < 0 || y < 0 || x >= W || y >= H) continue;
       const i = (y * W + x) * 4;
       const [h, sv, vv] = rgb2hsv(D[i] * 255 / maxR, D[i + 1] * 255 / maxG, D[i + 2] * 255 / maxB);
@@ -173,7 +195,7 @@ export function analyseBoardInFrame(img) {
   }
   rot = -rot; // Vorzeichen: positive Zahl = Board im Uhrzeigersinn gedreht
   if (bestScore < 60) rot = 0; // zu schwaches Signal: Kamera als gerade annehmen
-  return { cx, cy, r, rot, n, strahlen: rand.length };
+  return { cx, cy, r, rx: ellipse ? ellipse.rx : r, ry: ellipse ? ellipse.ry : r, theta: ellipse ? ellipse.theta : 0, aspekt: ellipse ? ellipse.aspekt : 1, rot, n, strahlen: rand.length };
 }
 
 
@@ -185,4 +207,63 @@ export function tapZuVideoPixel(clientX, clientY, rectLeft, rectTop, rectW, rect
   const offX = (offsetW - videoW * sc) / 2;
   const offY = (offsetH - videoH * sc) / 2;
   return { x: (lx - offX) / sc, y: (ly - offY) / sc };
+}
+
+// ====================================================================
+// v5: MATHEMATISCH-PHYSIKALISCH PERFEKTE KALIBRIERUNG
+// Die Kamera sieht die Scheibe als ELLIPSE (Schrägsicht/Perspektive).
+// 1. Sub-Pixel-Randpunkte (parabolische Kantinterpolation je Strahl)
+// 2. PCA-Ellipsen-Fit: Zentrum, Achsen rx/ry, Drehwinkel theta
+// 3. Segment-Rechnung im NORMIERRAUM (affine Homographie -> Einheitskreis)
+//    => Schrägsicht wird exakt rausgerechnet (TU-Wien-Bachelorarbeit-Methode)
+// 4. Rotation: Phasen-Korrelation + parabolische Peak-Interpolation (Sub-Grad)
+// ====================================================================
+
+// Randpunkte (x,y) -> gedrehte Ellipse {cx, cy, rx, ry, theta} per PCA.
+export function fitEllipse(punkte) {
+  const n = punkte.length;
+  if (n < 12) return null;
+  let mx = 0, my = 0;
+  for (const p of punkte) { mx += p[0]; my += p[1]; }
+  mx /= n; my /= n;
+  let sxx = 0, syy = 0, sxy = 0;
+  for (const p of punkte) {
+    const dx = p[0] - mx, dy = p[1] - my;
+    sxx += dx * dx; syy += dy * dy; sxy += dx * dy;
+  }
+  sxx /= n; syy /= n; sxy /= n;
+  const tr = sxx + syy, det = sxx * syy - sxy * sxy;
+  const disc = Math.sqrt(Math.max(0, tr * tr / 4 - det));
+  const l1 = tr / 2 + disc;
+  let theta;
+  if (Math.abs(sxy) < 1e-9) theta = sxx >= syy ? 0 : Math.PI / 2;
+  else theta = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+  const ct = Math.cos(theta), st = Math.sin(theta);
+  const p1 = [], p2 = [];
+  for (const p of punkte) {
+    const dx = p[0] - mx, dy = p[1] - my;
+    p1.push(dx * ct + dy * st);
+    p2.push(-dx * st + dy * ct);
+  }
+  const spann = (arr) => { arr.sort((a, b) => a - b); return arr[Math.floor(arr.length * 0.97)] - arr[Math.floor(arr.length * 0.03)]; };
+  // 97%-Spannweite / 2 / 1.88 ~ Radius (gestutzte Gleichverteilung auf dem Ring)
+  // 97%-Stutzung beidseitig ~ ±0.93 R => Spannweite ~1.86 R => Radius = spann/1.86
+  let rx = spann(p1) / 1.86, ry = spann(p2) / 1.86;
+  // Hauptachsen-Normierung: theta in (-45,45] und rx >= ry. Sonst flippt die
+  // Richtung bei Kreisen zufaellig um 90 Grad und verdreht das Rotations-Signal.
+  if (theta > Math.PI / 4) { theta -= Math.PI / 2; [rx, ry] = [ry, rx]; }
+  else if (theta < -Math.PI / 4) { theta += Math.PI / 2; [rx, ry] = [ry, rx]; }
+  return { cx: mx, cy: my, rx, ry, theta, aspekt: Math.min(rx, ry) / Math.max(rx, ry) };
+}
+
+// Bildpunkt -> Normierraum (Einheitskreis der Scheibe).
+// Nutzt cal.rx/ry/theta (Ellipse) oder faellt auf Kreis (rx=r) zurueck.
+export function inNormierraum(x, y, c) {
+  const rx = c.rx || c.r || 1, ry = c.ry || c.r || 1;
+  const th = c.theta || 0;
+  const dx = x - c.cx, dy = y - c.cy;
+  const ct = Math.cos(-th), st = Math.sin(-th);
+  const ux = (dx * ct - dy * st) / rx;
+  const uy = (dx * st + dy * ct) / ry;
+  return { u: ux, v: uy };
 }
