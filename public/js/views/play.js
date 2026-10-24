@@ -180,8 +180,8 @@ function renderX01Game(view) {
     el('span', { class: 'spacer' }),
     el('button', { class: 'gbtn', onclick: () => undo(session), title: 'Undo' }, icon('i-undo'), el('span', { class: 'hide-sm' }, 'Undo')),
     session.useBoard ? el('button', { class: 'gbtn', onclick: () => showBoardOverlay(session) }, icon('i-target'), el('span', { class: 'hide-sm' }, 'Scheibe')) : '',
-    el('button', { class: 'gbtn', onclick: () => { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) {} }, title: 'Vollbild' }, icon('i-target')),
-    el('button', { class: 'gbtn danger', onclick: endEarly, title: 'Beenden' }, icon('i-x'))
+    matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches ? '' : el('button', { class: 'gbtn', onclick: () => { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) {} }, title: 'Vollbild' }, icon('i-target'), el('span', { class: 'hide-sm' }, 'Vollbild')),
+    el('button', { class: 'gbtn danger', onclick: endEarly, title: 'Spiel beenden' }, el('span', {}, 'Beenden'))
   );
 
   const cards = el('div', { class: 'scorecards', id: 'scorecards' });
