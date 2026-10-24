@@ -17,9 +17,11 @@ import argparse, base64, json, os, subprocess, sys, tempfile, time
 from concurrent.futures import ThreadPoolExecutor
 
 MODELS = ["gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts", "gemini-2.5-flash-tts"]
-EUPHORIC_PREFIXES = ("ph-180", "ph-gameshot-high", "ph-match", "ph-bigfish", "ph-gameshot", "visit-", "sc-180")
-ROUTINE_PROMPT = "You are a professional darts caller at the oche. Announce in your steady, clear caller voice: "
-HIGH_PROMPT = "You are an ecstatic professional darts caller. Announce this huge moment loudly and excitedly: "
+EUPHORIC_PREFIXES = ("ph-180", "ph-gameshot-high", "ph-match", "ph-bigfish", "ph-gameshot", "ph-gay", "visit-", "sc-180")
+ROUTINE_PROMPT = "You are a professional darts caller at the oche. Announce in your steady, clear caller voice. Speak ONLY the exact phrase, nothing else, no laughing, no sounds before or after: "
+HIGH_PROMPT = "You are an ecstatic professional darts caller. Announce this huge moment loudly and excitedly. Speak ONLY the exact phrase, nothing else, no laughing, no sounds before or after: "
+MOCK_PREFIXES = ("ph-low-",)
+MOCK_PROMPT = "You are a professional darts caller. Mock the player who just threw an embarrassingly low score. Deliver this taunt with disdain. Speak ONLY the exact phrase, nothing else, no laughing, no sounds before or after: "
 
 def tts_request(key, voice, prompt_text, model):
     import urllib.request, urllib.error
@@ -101,7 +103,12 @@ def main():
 
     def work(pair):
         clip, text, path = pair
-        prompt = (HIGH_PROMPT if clip.startswith(EUPHORIC_PREFIXES) else ROUTINE_PROMPT) + text
+        if clip.startswith(MOCK_PREFIXES):
+            prompt = MOCK_PROMPT + text
+        elif clip.startswith(EUPHORIC_PREFIXES):
+            prompt = HIGH_PROMPT + text
+        else:
+            prompt = ROUTINE_PROMPT + text
         models = [args.model] if args.model else MODELS
         for attempt in range(10):  # 10 Versuche mit Exponential-Backoff (429-Kuehlphasen)
             for model in models:
@@ -166,6 +173,15 @@ def main():
         "langs": [args.lang],
         "full": str(args.full).lower() == "true",
     }
+    # BUGFIX: Bestehenden Eintrag NICHT komplett ersetzen — label/provider/complete
+    # eines vorhandenen Sets bleiben erhalten (sonst zerstoert ein Gemini-Nachtrag
+    # die Metadaten von ElevenLabs/edge-Sets, siehe 24.10.2026).
+    existing = next((s for s in manifest["sets"] if s["id"] == args.set_name), None)
+    if existing:
+        for k, v in existing.items():
+            if k != "langs":
+                entry[k] = v
+        entry["langs"] = sorted(set(existing.get("langs", [])) | {args.lang})
     manifest["sets"] = [s for s in manifest["sets"] if s["id"] != args.set_name] + [entry]
     manifest["sets"].sort(key=lambda s: (s["id"] != args.set_name, s.get("provider") != "elevenlabs", s["id"]))
     json.dump(manifest, open(mp, "w"), ensure_ascii=False, indent=1)

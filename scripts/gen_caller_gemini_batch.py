@@ -22,9 +22,11 @@ import argparse, base64, datetime, json, os, re, subprocess, sys, tempfile, time
 import urllib.request, urllib.error
 
 MODELS = ["gemini-2.5-flash-preview-tts", "gemini-2.5-pro-preview-tts"]
-EUPHORIC_PREFIXES = ("ph-180", "ph-gameshot-high", "ph-match", "ph-bigfish", "ph-gameshot", "visit-", "sc-180")
-ROUTINE_PROMPT = "You are a professional darts caller at the oche. Announce each of the following phrases one after another, with a clear pause between phrases: "
-HIGH_PROMPT = "You are an ecstatic professional darts caller. Announce each of the following huge moments loudly and excitedly, one after another, with a clear pause between phrases: "
+EUPHORIC_PREFIXES = ("ph-180", "ph-gameshot-high", "ph-match", "ph-bigfish", "ph-gameshot", "ph-gay", "visit-", "sc-180")
+ROUTINE_PROMPT = "You are a professional darts caller at the oche. Announce each of the following phrases one after another, with a clear pause between phrases. Speak ONLY the exact phrases, no laughing, no extra words: "
+HIGH_PROMPT = "You are an ecstatic professional darts caller. Announce these huge moments loudly and excitedly, one after another, with a clear pause between phrases. Speak ONLY the exact phrases, no laughing, no extra words: "
+MOCK_PREFIXES = ("ph-low-",)
+MOCK_PROMPT = "You are a professional darts caller. Mock players who just threw embarrassingly low scores. Deliver each taunt one after another, slowly, with disdain and a clear pause between phrases. Speak ONLY the exact phrases, no laughing, no extra words: "
 
 found_model = None
 
@@ -151,6 +153,9 @@ def main():
     def is_euphoric(clip):
         return clip.startswith(EUPHORIC_PREFIXES)
 
+    def is_mock(clip):
+        return clip.startswith(MOCK_PREFIXES)
+
     todo = []
     for clip, text in sorted(items.items()):
         path = os.path.join(outdir, clip + ".mp3")
@@ -164,9 +169,10 @@ def main():
     log(f"{args.set_name}: {len(items)} Clips total, {len(todo)} fehlen" + (f" (Shard {args.shard})" if args.shard else ""))
 
     batches = []
-    routine = [t for t in todo if not is_euphoric(t[0])]
-    euphoric = [t for t in todo if is_euphoric(t[0])]
-    for group in (routine, euphoric):
+    routine = [t for t in todo if not is_euphoric(t[0]) and not is_mock(t[0])]
+    euphoric = [t for t in todo if is_euphoric(t[0]) and not is_mock(t[0])]
+    mock = [t for t in todo if is_mock(t[0])]
+    for group in (routine, euphoric, mock):
         for i in range(0, len(group), args.batch_size):
             batches.append(group[i:i + args.batch_size])
     log(f"{len(batches)} Batches (Gruppe: {len(routine)} Routine / {len(euphoric)} euphorisch, je max {args.batch_size})")
@@ -181,7 +187,7 @@ def main():
             fail_clips += [t[0] for b in batches[bi:] for t in b]
             break
         clips = [(c, t) for c, t, _ in batch]
-        prompt = (HIGH_PROMPT if is_euphoric(batch[0][0]) else ROUTINE_PROMPT) + " ".join(
+        prompt = (MOCK_PROMPT if is_mock(batch[0][0]) else HIGH_PROMPT if is_euphoric(batch[0][0]) else ROUTINE_PROMPT) + " ".join(
             t if t.endswith((".", "!", "?")) else t + "." for _, t in clips)
         attempts = 0
         while attempts < 4:

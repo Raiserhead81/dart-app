@@ -75,10 +75,32 @@ window.addEventListener('beforeunload', (e) => {
 });
 
 configureCaller(store.state.settings?.caller || {});
+// Stim-Migration: unvollstaendiges Set im Storage -> einmalig auf elevenlabs-brian
+import('/js/caller-voice.js').then(async m => {
+  await m.loadCallerManifest();
+  if (store.state.settings?.caller?.voiceSet && !m.isVoiceSetComplete(store.state.settings.caller.voiceSet)) {
+    store.state.settings.caller.voiceSet = 'elevenlabs-brian';
+    store.state.settings.caller.voiceMigrated = true;
+    persist(store.state);
+    configureCaller(store.state.settings.caller);
+    rerender();
+  }
+  // KAY: Warmup erst nach dem Boot starten (frisst sonst die Bandbreite des App-Ladens)
+  setTimeout(() => m.warmClipCache(6), 8000);
+});
 
 // KAY-NEU: "Als App installieren" — Install-Prompt global fangen (Android/Chrome).
 window.__installEvt = null;
 window.addEventListener('beforeinstallprompt', (e) => { e.preventDefault(); window.__installEvt = e; rerender(); });
 window.addEventListener('appinstalled', () => { window.__installEvt = null; store.state.settings.installed = true; store.save(); rerender(); });
+
+// KAY: App GLOBAL im Vollbild — erste User-Geste geht in den Fullscreen (Browser
+// verlangt eine Geste dafuer). Einmalig, drueckt Kay Esc, bleibt es aus. iOS-PWA:
+// kein requestFullscreen, laeuft eh standalone (Manifest display:fullscreen fuer Android).
+document.addEventListener('pointerdown', function fsOnce() {
+  if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+    document.documentElement.requestFullscreen({ navigationUI: 'hide' }).catch(() => {});
+  }
+}, { once: true, capture: true });
 startUpdateWatcher(60000);
 rerender();

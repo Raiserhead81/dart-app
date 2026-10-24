@@ -370,6 +370,12 @@ async function playItem(item) {
     if (r === 'ok') return 'ok';
     if (r === 'blocked') return 'blocked';
   }
+  // KAY-FUN-Fallback: Clip fehlt im Set -> Geraetestimme statt Stille
+  if (item.tts && item.text) {
+    trace('tts-fallback', { text: item.text });
+    await speakFallback(item.text);
+    return 'tts';
+  }
   return 'missing';
 }
 
@@ -411,9 +417,9 @@ function textForClipId(id) {
   return '';
 }
 
-// KAY-FUN (gay + Trash-Talk): dafuer gibt es NOCH KEINE Clips in den Sets.
-// Bewusste Ausnahme vom Stimm-Mix-Verbot: Diese Phrasen laufen IMMER ueber die
-// Geraetestimme (laut), bis Clips generiert wurden — dann Flag hier entfernen.
+// KAY-FUN (gay + Trash-Talk): Clips wurden per Gemini-TTS generiert und liegen in
+// den Sets. FALLBACK-Regel: Fehlt der Clip in einem Set (404/missing), spricht die
+// GERAETSTIMME den Text — bewusste Ausnahme vom Stimm-Mix-Verbot, nie Stille.
 const FUN_TTS = /^(ph-gay|ph-low-[1-5])$/;
 
 function enqueueSequence(seq, { prio = 1, replace = false } = {}) {
@@ -551,7 +557,7 @@ export function fullClipList() {
   for (let n = 0; n <= 180; n++) urls.push('/caller/' + set + '/' + lang + '/sc-' + n + '.mp3');
   urls.push('/caller/' + set + '/' + lang + '/seg-miss.mp3', '/caller/' + set + '/' + lang + '/seg-bull.mp3', '/caller/' + set + '/' + lang + '/seg-25.mp3');
   for (let n = 1; n <= 20; n++) for (const k of ['s', 'd', 't']) urls.push('/caller/' + set + '/' + lang + '/seg-' + k + n + '.mp3');
-  for (const ph of ['gameshot', 'set', 'perf', 'gameshot-1', 'gameshot-2', 'gameshot-3', 'gameshot-high', 'bust', '180', 'mugsaway', 'bigfish', 'match']) urls.push('/caller/' + set + '/' + lang + '/ph-' + ph + '.mp3');
+  for (const ph of ['gameshot', 'set', 'perf', 'gameshot-1', 'gameshot-2', 'gameshot-3', 'gameshot-high', 'bust', '180', 'mugsaway', 'bigfish', 'match', 'gay', 'low-1', 'low-2', 'low-3', 'low-4', 'low-5']) urls.push('/caller/' + set + '/' + lang + '/ph-' + ph + '.mp3');
   for (let n = 100; n <= 179; n++) urls.push('/caller/' + set + '/' + lang + '/visit-' + n + '.mp3');
   return urls;
 }
