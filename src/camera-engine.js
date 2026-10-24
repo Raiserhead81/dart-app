@@ -52,18 +52,58 @@ export function findeNeuenPfeil(a, b, calOverride) {
     }
   }
   if (px.length < 6 || maxD < 150) return null;
-  // Blob-Ausdehnung
-  let lo = Infinity, hi = -Infinity;
-  for (const p of px) { if (p[1] < lo) lo = p[1]; if (p[1] > hi) hi = p[1]; }
-  const hoehe = hi - lo;
-  // SPITZE = oberes Drittel des Blobs (Pfeil haengt nach unten, Flight unten)
-  const grenze = lo + hoehe * 0.33;
-  let sw = 0, sx = 0, sy = 0, sn = 0;
-  for (const [x, y, w] of px) {
-    if (y <= grenze) { sw += w; sx += x * w; sy += y * w; sn++; }
+
+  // ===== v5: PFEIL ALS STARRER KOERPER (3D-Modell-Ansatz) =====
+  // Der Pfeil ist ein LANGGESTRECKTES Objekt: PCA-Hauptachse = Pfeilachse.
+  // Breitenprofil entlang der Achse: SPITZE schmal, Schaft duenn, FLIGHT breit.
+  // Trefferpunkt = schmales Ende (Schnitt Pfeilachse x Scheibenebene).
+  let mx = 0, my = 0;
+  for (const p of px) { mx += p[0]; my += p[1]; }
+  mx /= px.length; my /= px.length;
+  let sxx = 0, syy = 0, sxy = 0;
+  for (const p of px) { const dx = p[0] - mx, dy = p[1] - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; }
+  let theta = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+  if (Math.abs(sxy) < 1e-6) theta = sxx >= syy ? 0 : Math.PI / 2;
+  const ct = Math.cos(theta), st = Math.sin(theta);
+  // Projektionen auf die Pfeilachse (pos) + Breite (quer)
+  const entlang = px.map(p => (p[0] - mx) * ct + (p[1] - my) * st);
+  const quer = px.map(p => -(p[0] - mx) * st + (p[1] - my) * ct);
+  let pmin = Infinity, pmax = -Infinity;
+  for (const e of entlang) { if (e < pmin) pmin = e; if (e > pmax) pmax = e; }
+  const laenge = pmax - pmin;
+  // Breitenprofil: 8 Bnder entlang der Achse
+  const baender = 8;
+  const breite = new Array(baender).fill(0);
+  const summen = new Array(baender).fill(0);
+  for (let k = 0; k < px.length; k++) {
+    const band = Math.min(baender - 1, Math.max(0, Math.floor((entlang[k] - pmin) / laenge * baender)));
+    breite[band] += Math.abs(quer[k]);
+    summen[band]++;
   }
-  if (sn < 3) { for (const [x, y, w] of px) { sw += w; sx += x * w; sy += y * w; } }
-  return { x: sx / sw, y: sy / sw, staerke: maxD, pixel: px.length };
+  for (let k = 0; k < baender; k++) breite[k] = summen[k] ? breite[k] / summen[k] : 0;
+  // Spitze = das ENDE mit dem SCHMALEN Band (Flight = breites Ende).
+  // Vergleich: erstes vs letztes Band (mit Mittelung gegen Rauschen)
+  const vorn = (breite[0] + breite[1]) / 2;
+  const hinten = (breite[baender - 1] + breite[baender - 2]) / 2;
+  let spitzeT; // 0 = vorne (pmin), 1 = hinten (pmax)
+  if (vorn < hinten * 0.75) spitzeT = 0;          // vorne deutlich schmaler -> Spitze vorn
+  else if (hinten < vorn * 0.75) spitzeT = 1;     // hinten schmaler -> Spitze hinten
+  else spitzeT = null;                            // unklar (Pfeil fast frontal)
+  // Spitzenposition entlang der Achse + Rueckrechnung in Bildpixel
+  let ax, ay;
+  if (spitzeT === 0) { const t = pmin + laenge * 0.08; ax = mx + t * ct; ay = my + t * st; }
+  else if (spitzeT === 1) { const t = pmax - laenge * 0.08; ax = mx + t * ct; ay = my + t * st; }
+  else { ax = mx; ay = my; } // frontal: Schwerpunkt
+  // Feinverfeinerung: gewichteter Schwerpunkt der 25% Pixel am Spitzenende
+  const grenzT = spitzeT === 1 ? pmax - laenge * 0.25 : pmin + laenge * 0.25;
+  let sw = 0, sx2 = 0, sy2 = 0;
+  for (let k = 0; k < px.length; k++) {
+    const istSpitzenende = spitzeT === 1 ? entlang[k] >= grenzT : entlang[k] <= grenzT;
+    if (istSpitzenende || spitzeT === null) { sw += px[k][2]; sx2 += px[k][0] * px[k][2]; sy2 += px[k][1] * px[k][2]; }
+  }
+  const fx = sw > 0 ? sx2 / sw : ax, fy = sw > 0 ? sy2 / sw : ay;
+  // Spitzen-Schaetzung: 60% Achsen-Endpunkt (starrer Koerper) + 40% Pixel-Schwerpunkt
+  return { x: ax * 0.6 + fx * 0.4, y: ay * 0.6 + fy * 0.4, staerke: maxD, pixel: px.length, pfeilachse: Math.round(theta * 180 / Math.PI), spitzenende: spitzeT };
 }
 
 

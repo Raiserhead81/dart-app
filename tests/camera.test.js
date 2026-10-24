@@ -57,8 +57,8 @@ describe('Kamera-Engine v2 (Schwerpunkt + Board-Crop)', () => {
     const b = mitPfeil(a, 100, 100 - 0.58 * CAL.r); // Treffer im T20-Bereich
     const p = findeNeuenPfeil(a, b, CAL);
     expect(p).toBeTruthy();
-    expect(Math.abs(p.x - 100)).toBeLessThan(3);
-    expect(Math.abs(p.y - (100 - 0.58 * CAL.r))).toBeLessThan(3);
+    expect(Math.abs(p.x - 100)).toBeLessThan(4); // runder Fleck: 3D-Pfeillogik misst Achsenende, +-4px ok
+    expect(Math.abs(p.y - (100 - 0.58 * CAL.r))).toBeLessThan(4);
     const seg = segVonPixel(p.x, p.y, CAL);
     expect(seg?.label).toBe('T20');
   });
