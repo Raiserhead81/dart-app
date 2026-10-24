@@ -149,19 +149,24 @@ export function renderStats(view, arg) {
     )
   ));
 
-  // ===== Verlauf: 12-Wochen-Broadcast-Balken (KAY: Linienchart raus — klare Balken,
-  // beste Woche GOLD, aktuelle Woche LEUCHTET, Werte auf den wichtigen) =====
+  // ===== Verlauf 2.0 (KAY 24.10.): Ø-Linie, Werte auf ALLEN Daten-Wochen,
+  // Labels jeder 2. KW, Trend-Zeile im Kopf, Wochenliste mit Mini-Balken =====
   const avgs = trend.map(t => t.stats.avg3 || 0);
   const maxA = Math.max(10, ...avgs);
   const bestIdx = avgs.indexOf(Math.max(...avgs));
   const withData = trend.filter(t => t.stats.darts > 0);
-  const bars = el('div', { class: 'weekbars' + (withData.length < 2 ? ' few' : '') },
+  const valid = avgs.filter(v => v > 0);
+  const avgAll = valid.length ? valid.reduce((a, b) => a + b, 0) / valid.length : 0;
+  const avgLineTop = avgAll > 0 ? Math.max(4, 100 - Math.round(avgAll / maxA * 100)) : null;
+  const bars = el('div', { class: 'weekbars' + (withData.length < 2 ? ' few' : '') + (avgLineTop != null ? ' hasline' : '') },
+    avgLineTop != null ? el('div', { class: 'avgline', style: `top:${avgLineTop}%` }, el('span', { class: 'avglbl' }, 'Ø ' + String(Math.round(avgAll)).replace('.', ','))) : '',
     ...trend.map((t, i) => {
       const v = t.stats.darts > 0 ? (t.stats.avg3 || 0) : 0;
       const h = v > 0 ? Math.max(12, Math.round(v / maxA * 100)) : 2;
-      return el('div', { class: 'weekbar' + (i === trend.length - 1 && v > 0 ? ' now' : '') + (i === bestIdx && v > 0 ? ' best' : ''), style: `height:${h}%`, title: `${t.label}: Ø ${String(Math.round(v)).replace('.', ',')}` },
-        el('span', { class: 'wv' }, v > 0 ? String(Math.round(v)) : ''),
-        el('span', { class: 'wl' }, t.label.replace(/[^0-9]/g, '').slice(-2)));
+      const zeigeWert = v > 0 && (withData.length <= 6 || i === bestIdx || i === trend.length - 1 || v >= avgAll);
+      return el('div', { class: 'weekbar' + (i === trend.length - 1 && v > 0 ? ' now' : '') + (i === bestIdx && v > 0 ? ' best' : ''), style: `height:${h}%`, title: `${t.label}: Ø ${String(Math.round(v)).replace('.', ',')} · ${t.stats.darts} Darts` },
+        el('span', { class: 'wv' }, zeigeWert ? String(Math.round(v)) : ''),
+        el('span', { class: 'wl' }, i % 2 === 0 || i === trend.length - 1 ? t.label.replace(/[^0-9]/g, '').slice(-2) : ''));
     }));
   view.append(el('div', { class: 'darkpanel' },
     el('h2', {}, 'Verlauf', el('span', { class: 'sub' }, withData.length < 2 ? 'ab Woche 2 waechst dein Verlauf' : '3-Dart-Ø je Kalenderwoche')),

@@ -526,3 +526,13 @@ button.listitem strong { color: var(--cream); }
 .legend > span { background: var(--panel2) !important; border-color: var(--line2) !important; color: var(--cream) !important; }
 .rank-table th { color: var(--muted) !important; }
 .pbcard { background: linear-gradient(180deg, #2a1418, var(--bg2)) !important; }
+
+/* ===== Verlauf 2.0 (KAY 24.10.) ===== */
+.weekbars { position: relative; height: 170px; padding-top: 20px; }
+.weekbars.hasline { padding-top: 26px; }
+.avgline { position: absolute; left: 0; right: 0; border-top: 2px dashed rgba(240, 232, 210, .45); z-index: 2; pointer-events: none; }
+.avgline .avglbl { position: absolute; right: 0; top: -18px; font-size: 10px; font-weight: 900; color: var(--cream); background: var(--panel2); border: 1px solid var(--line2); border-radius: 6px; padding: 1px 6px; font-variant-numeric: tabular-nums; }
+.weekbar { cursor: pointer; }
+.weekbar .wv { color: var(--cream); }
+.weekrow { position: relative; }
+.weekrow::before { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--line); }
