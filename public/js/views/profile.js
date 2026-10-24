@@ -80,6 +80,18 @@ export function renderProfile(view) {
         };
       };
       kalibBtn.style.display = 'none';
+      // KAY: TORCH - Handy-LED als Scheibenbeleuchtung (Dunkelheits-Killer)
+      let torchAn = false;
+      const torchBtn = el('button', { class: 'btn wide mt', style: 'display:none' }, '💡 Blitz an (Scheibe beleuchten)');
+      torchBtn.style.display = '';
+      torchBtn.onclick = async () => {
+        const t = window.__profilStream?.getVideoTracks?.()[0];
+        if (!t) return;
+        torchAn = !torchAn;
+        const ok = await setzeTorch(t, torchAn);
+        torchBtn.textContent = ok ? (torchAn ? '💡 Blitz AUS' : '💡 Blitz an') : 'Blitz nicht verfügbar';
+        if (!ok) torchAn = false;
+      };
       kalibBtn.onclick = async () => {
         const v = videoHost.querySelector('video');
         if (!v) { status.textContent = 'Erst Kamera anzeigen'; return; }
@@ -99,7 +111,7 @@ export function renderProfile(view) {
       };
       host.append(
         el('h2', {}, 'Kamera-Kalibrierung'),
-        status, startBtn, videoHost, kalibBtn,
+        status, startBtn, videoHost, torchBtn, kalibBtn,
         el('p', { class: 'small muted mt' }, 'Handy vor die Scheibe, Kalibrieren drücken. Bei Dunkelheit: Bull und untere Doppelkante antippen.')
       );
       setTimeout(() => { const t = document.querySelector('#profilanchor'); if (t) t.after(host); else view.prepend ? view.prepend(host) : view.append(host); }, 0);

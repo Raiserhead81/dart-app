@@ -64,6 +64,26 @@ function frameGrab() {
 // Diff: neuen dunklen Punkt finden (Pfeilspitze). Liefert {x, y, staerke} oder null.
 export function findeNeuenPfeil(a, b) { setEngineCal(cal); return _finde(a, b, cal); }
 
+// ===== MAXIMALE KAMERA-OPTIMIERUNG (nur Handy-Cam) =====
+// 1) 1920er-Stream erzwingen, 30fps
+// 2) Fokus beruhigen (continuous-video statt Foto-Pumpen)
+// 3) Belichtung nach Kalibrierung einfrieren (keine Helligkeitsspruenge in Diffs)
+// 4) TORCH: Handy-LED als Scheibenbeleuchtung bei Dunkelheit
+export async function optimiereKamera(track) {
+  const versuche = [
+    { advanced: [{ focusMode: 'continuous-video' }] },
+    { advanced: [{ frameRate: 30 }] },
+  ];
+  for (const v of versuche) { try { await track.applyConstraints(v); } catch (e) { /* nicht unterstuetzt */ } }
+}
+export async function setzeTorch(track, an) {
+  try {
+    await track.applyConstraints({ advanced: [{ torch: !!an }] });
+    return true;
+  } catch (e) { return false; }
+}
+export function kamerataste() { try { return stream?.getVideoTracks?.()[0] || null; } catch (e) { return null; } }
+
 export async function startCam(deviceId) {
   const gespeichertesLabel = (() => { try { return localStorage.getItem('dartpro.camera.lenslabel') || ''; } catch (e) { return ''; } })();
   if (stream) { // Stream laeuft evtl. schon (alter View) -> NEUES Video anbinden!
@@ -84,7 +104,7 @@ export async function startCam(deviceId) {
   }
   try {
     stream = await navigator.mediaDevices.getUserMedia({
-      video: deviceId ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } } : { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false
+      video: deviceId ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } } : { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } }, audio: false
     });
     // KAY: ECHTEN Kamera-Zoom auf MAXIMAL WEIT (Weitwinkel) stellen - breitester
     // Ausschnitt, die Scheibe mit Umfeld. Der Slider zoomt spaet NUR die Ansicht.
@@ -100,6 +120,7 @@ export async function startCam(deviceId) {
     stream._weitwinkelOk = weitwinkelOk;
     video.srcObject = stream;
     await video.play();
+    optimiereKamera(stream.getVideoTracks()[0]).catch(() => {});
     return true;
   } catch (e) {
     return false;
