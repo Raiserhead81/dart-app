@@ -98,7 +98,7 @@ export function mountCam(host, onThrow, onStatus) {
     return;
   }
   host.dataset.camMounted = '1';
-  const v = el('video', { autoplay: '', playsinline: '', muted: '', style: 'width:110px;height:64px;object-fit:cover;border-radius:10px;background:#000;display:block' });
+  const v = el('video', { autoplay: '', playsinline: '', muted: '', style: 'width:100%;height:clamp(150px,26vh,300px);object-fit:contain;background:#000;display:block;border-radius:12px' });
   const note = el('div', { class: 'small muted', style: 'text-align:center;margin-top:2px;font-size:9.5px;line-height:1.25' }, 'Kamera startet…');
   host.append(v, note);
   video = v; // Modul-Referenz fuer frameGrab/startAuto
@@ -106,8 +106,12 @@ export function mountCam(host, onThrow, onStatus) {
   v.onclick = async (ev) => {
     if (phase.m !== 'kalib') return;
     const r = v.getBoundingClientRect();
-    const px = (ev.clientX - r.left) / r.width * (v.videoWidth || r.width);
-    const py = (ev.clientY - r.top) / r.height * (v.videoHeight || r.height);
+    // object-fit: contain -> sichtbarer Video-Bereich innerhalb des Elements
+    const sc = Math.min(r.width / (v.videoWidth || r.width), r.height / (v.videoHeight || r.height));
+    const offX = (r.width - (v.videoWidth || r.width) * sc) / 2;
+    const offY = (r.height - (v.videoHeight || r.height) * sc) / 2;
+    const px = (ev.clientX - r.left - offX) / sc;
+    const py = (ev.clientY - r.top - offY) / sc;
     if (!cal) { cal = { cx: px, cy: py, r: 100 }; note.textContent = 'Jetzt UNTERE Doppel-Aussenseite antippen'; }
     else if (cal.r === 100 && py !== cal.cy) {
       cal.r = Math.abs(py - cal.cy);
