@@ -80,6 +80,7 @@ button { font: inherit; }
 
 .view { flex: 1; padding: 16px 12px calc(var(--nav-h) + 22px); max-width: 1080px; margin: 0 auto; width: 100%; }
 @media (min-width: 940px) { .view { padding: 28px 32px 60px; } }
+@media (min-width: 940px) { .view-game { padding-bottom: 24px; } }
 
 /* Spielscreen: viewport-fuellend, kein Scroll auf Mobile */
 .view-game { display: flex; flex-direction: column; gap: 10px; padding-top: 10px; }

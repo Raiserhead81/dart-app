@@ -56,9 +56,33 @@ export function rerender() {
       className: 'panel', textContent: 'Fehler beim Rendern: ' + err.message
     }));
     console.error(err);
-  });
+  }).then(() => requestAnimationFrame(fitGameScreen));
   window.scrollTo({ top: 0 });
 }
+
+// KAY: Spielscreen OHNE Scrollen — skaliert den ganzen Spiel-Inhalt so, dass er in den
+// Viewport passt (Bottom-Rail bleibt drausen). Wirkt nur, wenn der Inhalt zu hoch ist.
+function fitGameScreen() {
+  const g = document.querySelector('.view-game');
+  if (!g) return;
+  g.style.transform = '';
+  const rail = document.querySelector('.rail');
+  const railFixed = rail && getComputedStyle(rail).position !== 'sticky';
+  const avail = window.innerHeight - (railFixed ? rail.offsetHeight : 0) - 8;
+  const padBottom = parseFloat(getComputedStyle(g).paddingBottom) || 0;
+  // padBottom ist nur auf Mobile Rail-Freiraum — auf Desktop (Rail links) volle Höhe zaehlen
+  const need = g.scrollHeight - (railFixed ? padBottom : 0);
+  if (need <= 0 || avail <= 0) return;
+  const f = Math.min(1, avail / need, (window.innerWidth - 8) / Math.max(1, g.scrollWidth));
+  if (f < 0.99) {
+    g.style.transformOrigin = 'top center';
+    g.style.transform = `scale(${Math.max(0.5, Math.round(f * 1000) / 1000)})`;
+    g.style.minHeight = '0';
+    g.style.height = Math.round(need * f) + 'px'; // Layout-Hoehe mitschrumpfen — sonst bleibt die Seite scrollbar
+  }
+}
+window.addEventListener('resize', fitGameScreen);
+window.addEventListener('orientationchange', fitGameScreen);
 
 // Boot-Hint entfernen, sobald die App das erste Mal gerendert hat
 rerender();
