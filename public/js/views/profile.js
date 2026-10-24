@@ -38,6 +38,25 @@ export function renderProfile(view) {
           v.srcObject = window.__profilStream;
           await v.play().catch(() => {});
           status.textContent = v.videoWidth ? 'Kamera läuft (' + v.videoWidth + 'px)' : 'warte auf Bild…';
+          // Danach automatisch auf die gespeicherte WEITWINKEL-Linse wechseln
+          try {
+            const gespeichert = localStorage.getItem('dartpro.camera.lenslabel');
+            if (gespeichert) {
+              const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+              const treffer = devs.find(d => d.label === gespeichert);
+              if (treffer) {
+                const ws2 = await Promise.race([
+                  navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: treffer.deviceId } }, audio: false }),
+                  new Promise((_, rej) => setTimeout(() => rej(new Error('lins-timeout')), 5000))
+                ]);
+                window.__profilStream.getTracks().forEach(t => t.stop());
+                window.__profilStream = ws2;
+                v.srcObject = ws2;
+                await v.play().catch(() => {});
+                status.textContent = 'Weitwinkel aktiv (' + v.videoWidth + 'px)';
+              }
+            }
+          } catch (e) { /* Weitwinkel fehlgeschlagen: Standard bleibt */ }
         } catch (e) {
           status.textContent = 'FEHLER: ' + e.message;
         }
