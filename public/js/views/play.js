@@ -187,7 +187,13 @@ function renderX01Game(view) {
       session.useCamera = !session.useCamera;
       store.save();
       if (session.useCamera) {
-        const host = document.getElementById('camhost') || (() => { const h = el('div', { id: 'camhost', style: 'flex:none;width:100%' }); document.querySelector('.view-game')?.prepend(h); return h; })();
+        const host = document.getElementById('camhost') || (() => {
+          const h = el('div', { id: 'camhost', style: 'position:fixed;top:0;left:0;right:0;height:75vh;z-index:30;background:#070b09;padding:6px 8px 4px;box-sizing:border-box' });
+          document.body.append(h);
+          const vg = document.querySelector('.view-game');
+          if (vg) { vg.style.paddingTop = 'calc(75vh + 10px)'; vg.style.minHeight = '0'; vg.style.height = 'auto'; }
+          return h;
+        })();
         mountCam(host, (seg) => {
           const korrektur = el('div', { style: 'position:fixed;left:50%;transform:translateX(-50%);bottom:86px;z-index:60;background:var(--red-deep);border:1px solid var(--red);border-radius:12px;padding:10px 16px;font-weight:900;font-size:14px;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.5)' },
             el('span', {}, `${seg.label} GEZÄHLT — falsch? `),
@@ -200,6 +206,7 @@ function renderX01Game(view) {
       } else {
         unmountCam();
         const h = document.getElementById('camhost'); if (h) h.remove();
+        const vg = document.querySelector('.view-game'); if (vg) vg.style.paddingTop = '';
         e.currentTarget.classList.remove('danger');
       }
     }, title: 'Kamera zählt selbst' }, icon('i-target'), el('span', { class: 'hide-sm' }, session.useCamera ? 'Kamera: AN' : 'Kamera: AUS')),
@@ -228,7 +235,13 @@ function renderX01Game(view) {
         fitGameScreen ? null : null;
       } }, padToggleTxt));
     view.insertBefore(manualRow, pad);
-    const camHost = document.getElementById('camhost') || (() => { const h = el('div', { id: 'camhost', style: 'flex:none;width:100%' }); document.querySelector('.view-game')?.prepend(h); return h; })();
+    const camHost = document.getElementById('camhost') || (() => {
+      const h = el('div', { id: 'camhost', style: 'position:fixed;top:0;left:0;right:0;height:75vh;z-index:30;background:#070b09;padding:6px 8px 4px;box-sizing:border-box' });
+      document.body.append(h);
+      const vg = document.querySelector('.view-game');
+      if (vg) { vg.style.paddingTop = 'calc(75vh + 10px)'; vg.style.minHeight = '0'; vg.style.height = 'auto'; }
+      return h;
+    })();
     mountCam(camHost, (seg) => {
       const korrektur = el('div', { style: 'position:fixed;left:50%;transform:translateX(-50%);bottom:86px;z-index:60;background:var(--red-deep);border:1px solid var(--red);border-radius:12px;padding:10px 16px;font-weight:900;font-size:14px;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.5)' },
         el('span', {}, `${seg.label} GEZÄHLT — falsch? `),
