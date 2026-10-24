@@ -8,6 +8,7 @@ import { renderOnlineMatch } from '/js/views/onlinematch.js';
 import { renderTraining } from '/js/views/training.js';
 import { renderStats } from '/js/views/stats.js';
 import { renderLegal } from '/js/views/legal.js';
+import { renderCamera } from '/js/views/camera.js';
 import { renderProfile } from '/js/views/profile.js';
 import { renderOnline } from '/js/views/online.js';
 
@@ -31,7 +32,8 @@ const routes = {
   online: renderOnline,
   profile: renderProfile,
   match: renderOnlineMatch,
-  legal: renderLegal
+  legal: renderLegal,
+  camera: renderCamera
 };
 
 function currentRoute() {

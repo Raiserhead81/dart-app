@@ -13,7 +13,8 @@ export function renderProfile(view) {
   // ----- Profile -----
   const profPanel = el('div', { class: 'panel' },
     el('h2', {}, 'Profile', el('span', { class: 'sub' }, `${s.profiles.length}/${MAX_PROFILES} · Statistiken pro Spieler getrennt`)),
-    el('a', { href: '#/legal', style: 'display:inline-block;margin:0 0 10px;font-size:13px' }, 'Impressum & Datenschutz'),
+    el('a', { href: '#/legal', style: 'display:inline-block;margin:0 8px 10px 0;font-size:13px' }, 'Impressum & Datenschutz'),
+    el('a', { href: '#/camera', style: 'display:inline-block;margin:0 0 10px;font-size:13px' }, 'Kamera-Assistent'),
     el('div', { class: 'list' },
       ...(s.profiles.length ? s.profiles.map(p => el('div', { class: 'listitem' },
         el('div', { class: 'grow' },
