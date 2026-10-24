@@ -84,7 +84,16 @@ function clipCandidatesForId(clipId) {
   if ((m = clipId.match(/^visit-(\d+)$/))) return clipCandidates('visit', +m[1]);
   if ((m = clipId.match(/^dx-(.+?)(-(match|game))?$/))) return clipCandidates('double', m[1], m[3] || null);
   if ((m = clipId.match(/^seg-(.+)$/))) return clipCandidates('seg', m[1]);
-  if ((m = clipId.match(/^ph-(.+)$/))) return clipCandidates('phrase', m[1]);
+  if ((m = clipId.match(/^ph-(.+)$/))) {
+    const c = clipCandidates('phrase', m[1]);
+    // KAY: Phrasen-Clips existieren meist nur als EN — bei deutscher App zuerst DE
+    // versuchen, dann EN-Clip (statt Geraetestimme). playItem probiert Kandidaten der Reihe nach.
+    if (settings.lang === 'de') {
+      const en = `/caller/${settings.voiceSet || 'elevenlabs-brian'}/en/ph-${m[1]}.mp3`;
+      if (!c.includes(en)) c.push(en);
+    }
+    return c;
+  }
   return [];
 }
 
