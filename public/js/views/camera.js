@@ -113,6 +113,7 @@ export function stopCam() {
 // Kalibrierung speichern (Handy-Position vorausgesetzt)
 export function saveCal() { if (cal && store) { store.state.settings.cameraCal = cal; store.save(); } }
 export function camCalRef() { return cal; }
+export function aktuellerStream() { return stream; }
 export function setCal(c) { cal = c; }
 export function loadCal() {
   const c = store?.state?.settings?.cameraCal;

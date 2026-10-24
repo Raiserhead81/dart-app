@@ -14,6 +14,65 @@ export function renderProfile(view) {
   const profPanel = el('div', { class: 'panel' },
     el('h2', {}, 'Profile', el('span', { class: 'sub' }, `${s.profiles.length}/${MAX_PROFILES} · Statistiken pro Spieler getrennt`)),
     el('a', { href: '#/legal', style: 'display:inline-block;margin:0 8px 10px 0;font-size:13px' }, 'Impressum & Datenschutz'),
+    // ===== KAMERA-KALIBRIERUNG (direkt im Profil, wie Kay es will) =====
+    (function kameraSektion() {
+      const host = el('div', { class: 'panel', id: 'profilkamera' });
+      const status = el('div', { class: 'small muted' }, store.state.settings.cameraCal ? '✓ kalibriert' : 'noch nicht kalibriert');
+      const videoHost = el('div', { style: 'display:none;margin-top:8px;position:relative' });
+      let phase = 'idle';
+      const kalibBtn = el('button', { class: 'btn primary wide mt' }, '① Kalibrieren');
+      const startBtn = el('button', { class: 'btn wide mt' }, 'Kamera anzeigen');
+      startBtn.onclick = async () => {
+        const v = el('video', { autoplay: '', playsinline: '', muted: '', style: 'width:100%;max-height:40vh;object-fit:contain;background:#000;border-radius:12px;display:block' });
+        videoHost.innerHTML = '';
+        videoHost.append(v);
+        videoHost.style.display = '';
+        kalibBtn.style.display = '';
+        status.textContent = 'Kamera startet…';
+        try { window.__profilVideo = v; await startCam(); v.srcObject = (window.__profilStream = window.__profilStream || null); } catch (e) {}
+        // startCam bindet Modul-video; hier eigenes srcObject setzen:
+        try {
+          const m = await import('/js/views/camera.js');
+          v.srcObject = m.aktuellerStream ? m.aktuellerStream() : v.srcObject;
+        } catch (e) {}
+        status.textContent = v.videoWidth ? 'Kamera läuft' : 'Kamera läuft (warte auf Bild)';
+        v.onclick = async (ev) => {
+          if (phase === 'kalib-bull' || phase === 'kalib-rand') {
+            const rect = v.getBoundingClientRect();
+            const zoom = v.style.transform ? (parseFloat(v.style.transform.replace(/[^\d.]/g, '')) || 1) : 1;
+            const lx = (ev.clientX - rect.left) / zoom, ly = (ev.clientY - rect.top) / zoom;
+            const sc = Math.min(v.offsetWidth / (v.videoWidth || v.offsetWidth), v.offsetHeight / (v.videoHeight || v.offsetHeight));
+            const px = (lx - (v.offsetWidth - (v.videoWidth || v.offsetWidth) * sc) / 2) / sc;
+            const py = (ly - (v.offsetHeight - (v.videoHeight || v.offsetHeight) * sc) / 2) / sc;
+            const c = camCalRef() || { cx: 0, cy: 0, r: 100 };
+            if (phase === 'kalib-bull') { c.cx = px; c.cy = py; c.r = c.r || 100; setCal(c); phase = 'kalib-rand'; status.textContent = 'Jetzt UNTERE äußere Doppelkante antippen'; }
+            else { c.r = Math.abs(py - c.cy); setCal(c); saveCal(); phase = 'idle'; status.textContent = '✓ Manuell kalibriert (R=' + Math.round(c.r) + 'px)'; kalibBtn.textContent = 'Neu kalibrieren'; }
+          }
+        };
+      };
+      kalibBtn.style.display = 'none';
+      kalibBtn.onclick = async () => {
+        const v = videoHost.querySelector('video');
+        if (!v) { status.textContent = 'Erst Kamera anzeigen'; return; }
+        kalibBtn.textContent = 'Kalibriere…';
+        const erg = await autoKalibriere(v);
+        if (erg) {
+          setCal(erg); saveCal();
+          kalibBtn.textContent = 'Neu kalibrieren';
+          status.textContent = '✓ Automatisch kalibriert: Mitte ' + Math.round(erg.cx) + '/' + Math.round(erg.cy) + ', R=' + Math.round(erg.r) + 'px';
+        } else {
+          phase = 'kalib-bull';
+          kalibBtn.textContent = 'Auto fehlgeschlagen - tippe aufs BULL';
+          status.textContent = 'Automatik fand nichts (zu dunkel). TIPPE: 1. Bull-Mitte  2. untere Doppelkante';
+        }
+      };
+      host.append(
+        el('h2', {}, 'Kamera-Kalibrierung'),
+        status, startBtn, videoHost, kalibBtn,
+        el('p', { class: 'small muted mt' }, 'Handy vor die Scheibe, Kalibrieren drücken. Bei Dunkelheit: Bull und untere Doppelkante antippen.')
+      );
+      setTimeout(() => { const t = document.querySelector('#profilanchor'); if (t) t.after(host); else view.prepend ? view.prepend(host) : view.append(host); }, 0);
+    })(),
     el('a', { href: '#/camera', style: 'display:inline-block;margin:0 0 10px;font-size:13px' }, 'Kamera-Assistent'),
     el('div', { class: 'list' },
       ...(s.profiles.length ? s.profiles.map(p => el('div', { class: 'listitem' },
