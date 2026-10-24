@@ -30,7 +30,7 @@ export function renderLegal(view) {
     ),
     el('div', { class: 'panel' },
       el('h2', {}, 'Datenschutzerklärung'),
-      ...DATENSCHUTZ.map(([h, t]) => el('div', { class: 'mt' }, el('h3', { style: 'font-size:13px;margin:0 0 4px' }, h), el('p', { style: 'margin:0;font-size:14px' }, t))))
+      ...DATENSCHUTZ.map(([h, t]) => el('div', { class: 'mt' }, el('h3', { style: 'font-size:13px;margin:0 0 4px' }, h), el('p', { style: 'margin:0;font-size:14px' }, t)))
     ),
     el('button', { class: 'btn ghost', onclick: () => { history.back(); } }, 'Zurück')
   );
