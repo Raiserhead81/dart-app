@@ -29,13 +29,10 @@ export function renderProfile(view) {
         videoHost.style.display = '';
         kalibBtn.style.display = '';
         status.textContent = 'Kamera startet…';
-        try { window.__profilVideo = v; await startCam(); v.srcObject = (window.__profilStream = window.__profilStream || null); } catch (e) {}
-        // startCam bindet Modul-video; hier eigenes srcObject setzen:
-        try {
-          const m = await import('/js/views/camera.js');
-          v.srcObject = m.aktuellerStream ? m.aktuellerStream() : v.srcObject;
-        } catch (e) {}
-        status.textContent = v.videoWidth ? 'Kamera läuft' : 'Kamera läuft (warte auf Bild)';
+        await startCam();
+        v.srcObject = aktuellerStream();
+        try { await v.play(); } catch (e) {}
+        setTimeout(() => { status.textContent = v.videoWidth ? 'Kamera läuft' : 'Kein Bild - Kamera prüfen'; }, 1500);
         v.onclick = async (ev) => {
           if (phase === 'kalib-bull' || phase === 'kalib-rand') {
             const rect = v.getBoundingClientRect();
