@@ -29,10 +29,24 @@ export function renderProfile(view) {
         videoHost.style.display = '';
         kalibBtn.style.display = '';
         status.textContent = 'Kamera startet…';
-        await startCam();
+        // Harte Begrenzung: manche WebViews loesen getUserMedia nie auf
+        const mitTimeout = (p, ms, msg) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(msg)), ms))]);
+        try {
+          await mitTimeout(startCam(), 6000, 'timeout');
+        } catch (e) {
+          status.textContent = 'Kamera-Start problematisch (' + e.message + ') - versuche Standard-Kamera…';
+        }
+        const st = aktuellerStream();
+        if (!st) {
+          // letzter Versuch: ganz ohne gespeicherte Linse
+          try {
+            localStorage.removeItem('dartpro.camera.lenslabel');
+            await mitTimeout(startCam(), 6000, 'timeout2');
+          } catch (e) { status.textContent = 'Kamera startet nicht - App neu starten'; return; }
+        }
         v.srcObject = aktuellerStream();
         try { await v.play(); } catch (e) {}
-        setTimeout(() => { status.textContent = v.videoWidth ? 'Kamera läuft' : 'Kein Bild - Kamera prüfen'; }, 1500);
+        setTimeout(() => { status.textContent = v.videoWidth ? 'Kamera läuft (' + v.videoWidth + 'px)' : 'Kein Bild - Licht/Display prüfen'; }, 1500);
         v.onclick = async (ev) => {
           if (phase === 'kalib-bull' || phase === 'kalib-rand') {
             const rect = v.getBoundingClientRect();
