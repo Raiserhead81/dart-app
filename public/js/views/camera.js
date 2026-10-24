@@ -186,6 +186,27 @@ export function mountCam(host, onThrow, onStatus) {
   video = v; // Modul-Referenz fuer frameGrab/startAuto
   const phase = { m: 'idle' };
   v.onclick = async (ev) => {
+    if (phase.mode === 'kalib-bull' || phase.mode === 'kalib-rand') {
+      const rect = v.getBoundingClientRect();
+      const zoom = v.style.transform ? (parseFloat(v.style.transform.replace(/[^\d.]/g, '')) || 1) : 1;
+      const lx = (ev.clientX - rect.left) / zoom, ly = (ev.clientY - rect.top) / zoom;
+      const sc = Math.min(v.offsetWidth / (v.videoWidth || v.offsetWidth), v.offsetHeight / (v.videoHeight || v.offsetHeight));
+      const offX = (v.offsetWidth - (v.videoWidth || v.offsetWidth) * sc) / 2;
+      const offY = (v.offsetHeight - (v.videoHeight || v.offsetHeight) * sc) / 2;
+      const px = (lx - offX) / sc, py = (ly - offY) / sc;
+      if (phase.mode === 'kalib-bull') {
+        cal = { cx: px, cy: py, r: 100 };
+        note.textContent = 'Jetzt UNTERE aeussere Doppelkante antippen';
+        phase.mode = 'kalib-rand';
+      } else {
+        cal.r = Math.abs(py - cal.cy);
+        saveCal();
+        phase.mode = 'idle';
+        note.textContent = 'MANUELL KALIBRIERT (R=' + Math.round(cal.r) + 'px) - fertig!';
+        if (window.__manuellKalib) window.__manuellKalib(cal);
+      }
+      return;
+    }
     if (phase.m !== 'kalib' && phase.m !== 'kalib-check') return;
     // ZOOM-SICHER (wie tapEingabe): offset-Masse + entzoomen vor contain-Mapping
     const ow = v.offsetWidth || v.videoWidth, oh = v.offsetHeight || v.videoHeight;
@@ -370,11 +391,17 @@ export function renderCamera(view) {
     kalibBtn.disabled = true;
     const erg = await autoKalibriere(video);
     kalibBtn.disabled = false;
-    if (!erg) { kalibBtn.textContent = 'Nicht gefunden - Licht/Position prüfen, nochmal'; kalibErgebnis.textContent = ''; return; }
+    if (!erg) {
+      // FALLBACK: automatisch gescheitert -> MANUELL per Finger-Tipps (100% zuverlaessig)
+      kalibBtn.textContent = 'Auto fehlgeschlagen - MANUELL: tippe aufs BULL';
+      kalibErgebnis.textContent = 'Automatische Erkennung fand kein Board (zu dunkel/entsaettigt). TIPPE JETZT: 1. Bull-Mitte  2. untere aeussere Doppelkante  3. nochmal Bull (Kontrolle).';
+      phase.mode = 'kalib-bull';
+      window.__manuellKalib = (c) => { zeichneRaster(video, c); kalibBtn.textContent = '✓ Manuell kalibriert - nochmal?'; };
+      return;
+    }
     cal = erg; saveCal();
     kalibBtn.textContent = '✓ Kalibriert - nochmal?';
     kalibErgebnis.textContent = 'Zentrum ' + Math.round(erg.cx) + '/' + Math.round(erg.cy) + ' · Radius ' + Math.round(erg.r) + 'px — gespeichert, das Spiel nutzt sie ab sofort.';
-    // Raster als Beweis uebers Live-Bild
     zeichneRaster(video, erg);
   };
   refBtn.style.display = '';
