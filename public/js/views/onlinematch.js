@@ -6,7 +6,7 @@ import { buildBoard } from '/js/board.js';
 import { el, icon, toast } from '/js/util.js';
 import { parseThrowInput, makeThrow } from '/js/core/segments.js';
 import { suggestCheckout } from '/js/core/checkout.js';
-import { callDart, callVisitEnd, callGameShot, callBust, clearQueue, preloadForRest } from '/js/caller-voice.js';
+import { callVisitEnd, callGameShot, callBust, clearQueue, preloadForRest } from '/js/caller-voice.js';
 import { store, rerender } from '/js/app.js';
 
 const POLL_MS = 1500;
@@ -18,6 +18,8 @@ export function renderOnlineMatch(view, matchId) {
 
   let lastState = null;
   let myLastVisitLength = 0;
+  let visitLabels = [];   // KAY: Segmente des laufenden Visits (Gay-Check 1+5+20)
+  let visitStartRest = null; // Rest VOR dem Visit (fuer echte Visit-Summe)
   let pollTimer = null;
   let dead = false;
 
@@ -37,14 +39,26 @@ export function renderOnlineMatch(view, matchId) {
 
   async function throwDart(t, boardSeg) {
     clearQueue();
-    const restBefore = lastState?.state?.leg?.remaining?.[lastState.state.current];
+    const throwerIdx = lastState?.state?.current;
+    const restBefore = lastState?.state?.leg?.remaining?.[throwerIdx];
+    if (lastState?.state?.leg?.visit?.length === 0) visitStartRest = restBefore; // neues Visit
     const forMatch = lastState && lastState.legsWonMe === lastState.firstTo - 1;
     try {
       const res = await api.throwDart(matchId, { dart: t });
       if (res.error) return toast(res.error);
-      if (boardSeg) callDart({ k: t.k, n: t.n, v: t.v });
+      // KAY: KEINE Einzel-Dart-Ansage mehr — Caller spricht erst am Visit-Ende die Summe
+      const segLabel = t.k === 'bull' ? 'bull' : t.k === 'outer' ? '25' : (t.k[0] + t.n);
+      visitLabels.push(segLabel);
       if (res.event?.type === 'bust') callBust();
-      if (res.event?.type === 'turn' || res.event?.type === 'bust') callVisitEnd(restBefore, { forMatch });
+      if (res.event?.type === 'turn' || res.event?.type === 'bust') {
+        const restAfter = res.state?.leg?.remaining?.[throwerIdx];
+        const points = (Number.isFinite(visitStartRest) && Number.isFinite(restAfter)) ? Math.max(0, visitStartRest - restAfter) : null;
+        callVisitEnd(Number.isFinite(restAfter) ? restAfter : restBefore, {
+          forMatch, bust: res.event?.type === 'bust', labels: visitLabels, points
+        });
+        visitLabels = [];
+        visitStartRest = null;
+      }
       if (res.event?.type === 'leg') callGameShot(res.legsWonMe, res.legsWonOpp, false);
       if (res.event?.type === 'match') callGameShot(res.legsWonMe, res.legsWonOpp, true);
       render(res);

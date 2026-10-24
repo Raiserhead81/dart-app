@@ -9,17 +9,24 @@ export const GAP_AFTER_DARTS = 400;
 export const GAP_CHECKOUT = 350;
 export const GAP_APPLAUSE = 200;
 
-// visit: { labels: ['t20','t20','s20'], rest, bust, visit180, visit100 }
+// visit: { labels: ['t20','t20','s20'], rest, bust, visit180, visit100, points }
+// KAY-UMBAU: keine Einzel-Segment-Calls mehr im Visit — stattdessen NUR nach dem
+// dritten Dart die SUMME. Spezial: 1+5+20 (egal welche Reihenfolge) = "GAAAY!!",
+// Summe 1..9 = Trash-Talk (Beleidigung), 100..179 = euphorischer visit-Clip.
 // checkout: { clipId: 'co-96'|'dx-D16-match', } | null
 export function visitSequence(visit, checkoutClipId = null) {
-  const { labels = [], rest, bust = false, visit180 = false } = visit;
+  const { labels = [], rest, bust = false, visit180 = false, points = null } = visit;
   const seq = [];
   if (bust) {
     seq.push({ clipId: 'ph-bust', gapBeforeMs: 0 });
   } else if (visit180) {
     seq.push({ clipId: 'ph-180', gapBeforeMs: 0 });
+  } else if (isGayVisit(labels)) {
+    seq.push({ clipId: 'ph-gay', gapBeforeMs: 0 });
   } else {
-    labels.forEach((l, i) => seq.push({ clipId: 'seg-' + l, gapBeforeMs: i === 0 ? 0 : GAP_DART }));
+    if (points != null && points >= 100 && points <= 179) seq.push({ clipId: 'visit-' + points, gapBeforeMs: 0 });
+    else if (points != null) seq.push({ clipId: 'sc-' + points, gapBeforeMs: 0 });
+    if (points != null && points >= 1 && points <= 9) seq.push({ clipId: 'ph-low-' + (((points - 1) % 5) + 1), gapBeforeMs: GAP_DART });
   }
   if (rest >= 2) {
     // "IMMER You require <rest>" — Clips existieren fuer 2..170, darueber greift TTS-Fallback
@@ -27,6 +34,11 @@ export function visitSequence(visit, checkoutClipId = null) {
     if (!bust && checkoutClipId) seq.push({ clipId: checkoutClipId, gapBeforeMs: GAP_CHECKOUT });
   }
   return seq;
+}
+
+// KAY: 1, 5 UND 20 im selben Visit (Reihenfolge egal) => "GAAAY!!" statt Summe
+export function isGayVisit(labels = []) {
+  return [...labels].slice(0, 3).sort().join(',') === 's1,s20,s5';
 }
 
 // End-Moment: Game Shot (+ Legstand), Match: + "Game, set and match" + laengerer Applaus.

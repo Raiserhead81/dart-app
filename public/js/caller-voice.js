@@ -11,7 +11,7 @@
 // bei der ersten User-Geste entsperrt (unlockAudio) — kein Element wird mehr mitten
 // in einer Sequenz neu erzeugt/entsperrt, Reihenfolge 100%.
 
-import { remainingCallerWords, checkoutCallWords, throwCallerWords, gameShotCallerWords } from '/js/core/caller.js';
+import { remainingCallerWords, checkoutCallWords, throwCallerWords, gameShotCallerWords, numberToCallerWords } from '/js/core/caller.js';
 import { suggestCheckout } from '/js/core/checkout.js';
 import { visitSequence, endSequence } from '/js/core/caller-sequence.js';
 
@@ -43,7 +43,21 @@ export async function loadCallerManifest() {
       manifest.sets.push({ id: DEVICE_SET, label: 'Gerätstimme', provider: 'device', full: true });
     }
   }
+  // STIMM-MIGRATION (Kay-Hard-Stopp): gespeichertes voiceSet zeigt auf ein UNVOLLSTÄNDIGES
+  // Set (complete:false im Manifest) -> EINMALIG zurück auf elevenlabs-brian. Nie wieder
+  // automatisch in ein unvollständiges Set fallen; freiwilige Wahl bleibt möglich.
+  if (settings.voiceSet && !settings.voiceMigrated && !isVoiceSetComplete(settings.voiceSet)) {
+    settings.voiceSet = 'elevenlabs-brian';
+    settings.voiceMigrated = true;
+  }
   return manifest;
+}
+
+// complete-Flag aus dem Manifest (unbekannte Sets/device gelten als ok)
+export function isVoiceSetComplete(id) {
+  if (!manifest || !id || id === DEVICE_SET) return true;
+  const e = manifest.sets.find(s => s.id === id);
+  return !e || e.complete !== false;
 }
 
 function clipUrlFor(set, kind, a, b) {
@@ -103,13 +117,13 @@ function acquireAudio(url) {
 // Der error-Listener wird PRO URL gescopet: Ein VERSPÄTETER 404-Error eines alten
 // Preloads darf NIE die gerade geladene URL als "missing" markieren (hat exakt die
 // verschwundenen "You require"-Sätze erzeugt — Kays Gebrabbel-Lücken).
-function attachUrl(a, url) {
-  if (a.__loadedUrl === url) return false;
+function attachSrc(a, url, src) {
+  if (a.__loadedUrl === url && a.__srcBound === src) return false;
   if (a.__errFn) a.removeEventListener('error', a.__errFn);
   a.__loadedUrl = url;
   a.__errFn = () => missing.add(url);
   a.addEventListener('error', a.__errFn);
-  try { a.src = url; } catch (e) { /* egal */ }
+  try { a.src = src; a.__srcBound = src; } catch (e) { /* egal */ }
   return true;
 }
 
@@ -129,7 +143,7 @@ export function preloadClips(urls) {
     if (!u || missing.has(u)) continue;
     const a = acquireAudio(u);
     if (!a) continue;
-    attachUrl(a, u);
+    attachSrc(a, u, u);
     try { a.load(); } catch (e) { /* egal */ }
   }
 }
@@ -250,9 +264,9 @@ async function drain() {
     const item = queue.shift();
     if (!item) continue;
     if (item.gapBeforeMs) { trace('gap', { ms: item.gapBeforeMs }); await sleep(item.gapBeforeMs); }
-    if (settings.voiceSet === DEVICE_SET) {
-      trace('tts', { text: item.text });
-      await speakFallback(item.text); // explizites Gerätstimme-Set
+    if (settings.voiceSet === DEVICE_SET || item.tts) {
+      trace('tts', { text: item.text, fun: !!item.tts });
+      await speakFallback(item.text); // explizites Gerätstimme-Set bzw. KAY-FUN-Phrasen
       continue;
     }
     // Clip-Fallback-AUS: fehlt der Clip -> Stille. Kein speechSynthesis-Auto-Mix.
@@ -279,9 +293,34 @@ async function playItem(item) {
   for (const a of audioCache.values()) { if (!a.paused) { try { a.pause(); } catch (e) {} } }
   for (const url of candidates) {
     if (!url || missing.has(url)) continue;
+    // KAY: Wiedergabe bevorzugt als Blob aus dem Browser-Cache — kein Netz-Roundtrip
+    // mitten im Spiel, keine Mobilfunk-Latenz, kein Stocken. 404 (= Clip fehlt im Set)
+    // wird NUR ueber den HTTP-Status erkannt — nie ueber Media-Events (die feuern auch
+    // bei Blob-/Format-Hicksern und haben Kays Staemme als "fehlt dauerhaft" markiert).
+    let src = url;
+    try {
+      if (typeof caches !== 'undefined' && !blobUrls.has(url)) {
+        let hit = await cacheHitAny(url);
+        if (!hit) {
+          const res = await fetch(url, { cache: 'reload' }); // SW legt parallel in den Cache
+          if (res.status === 404) {
+            missing.add(url);
+            trace('missing', { url: url.split('/').pop(), reason: '404' });
+            continue;
+          }
+          if (res.ok) {
+            const c = await caches.open(CLIP_CACHE);
+            await c.put(url, res.clone());
+            hit = await c.match(url);
+          }
+        }
+        if (hit) blobUrls.set(url, URL.createObjectURL(await hit.blob()));
+      }
+      if (blobUrls.has(url)) src = blobUrls.get(url);
+    } catch (e) { /* egal — echter src bleibt */ }
     const a = acquireAudio(url);
     if (!a) continue;
-    attachUrl(a, url);
+    attachSrc(a, url, src);
     try { a.load(); } catch (e) { /* egal */ }
     const r = await new Promise(resolve => {
       a.playbackRate = item.rate || settings.rate || 1;
@@ -304,10 +343,14 @@ async function playItem(item) {
         if (current && current.url === url) current = null;
       };
       const done = () => finish('ok');
-      const err = () => { missing.add(url); finish('missing'); };
+      const err = () => {
+        // Media-Error heisst NICHT "Clip fehlt im Set" — nur echtes 404 (oben) markiert.
+        if (src === url) missing.add(url);
+        finish('missing');
+      };
       a.addEventListener('ended', done);
       a.addEventListener('error', err);
-      trace('play', { url: url.split('/').pop() });
+      trace('play', { url: url.split('/').pop(), blob: src.startsWith('blob:') });
       a.play().then(() => {
         // Sicherheitsnetz: 'ended' feuert auf manchen Mobil-Browsern nicht zuverlässig.
         // Bekannte Clip-Dauer (Metadata) + Puffer beendet den Satz sicher — nicht 20s warten.
@@ -348,8 +391,15 @@ function textForClipId(id) {
     const kind = k[0] === 't' ? 'triple' : k[0] === 'd' ? 'double' : 'single';
     return throwCallerWords({ k: kind, n: parseInt(k.slice(1), 10), v: 0 }, settings.lang);
   }
+  if ((m = id.match(/^sc-(\d+)$/))) return numberToCallerWords(+m[1], settings.lang);
   if ((m = id.match(/^visit-(\d+)$/))) return throwCallerWords({ k: 'sum', v: +m[1] }, settings.lang) + '!!';
   if (id === 'ph-180') return 'One hundred and eighty!';
+  if (id === 'ph-gay') return 'GAAAY!!';
+  if ((m = id.match(/^ph-low-([1-5])$/))) {
+    const LOW_EN = ['You call that darts?! Appalling!', 'Absolutely dreadful!', 'Shocking! Simply shocking!', 'Embarrassing. Truly embarrassing!', 'My grandmother throws better than you!'];
+    const LOW_DE = ['Das soll Darts sein?! Grauenhaft!', 'Absolut grausig!', 'Schockierend! Einfach schockierend!', 'Peinlich. Wirklich peinlich!', 'Meine Oma wirft besser als du!'];
+    return (settings.lang === 'de' ? LOW_DE : LOW_EN)[+m[1] - 1];
+  }
   if (id === 'ph-set') return 'Set!';
   if (id === 'ph-perf') return 'What a performance!';
   if (id === 'ph-bust') return settings.lang === 'de' ? 'Kein Score!' : 'No score!';
@@ -361,9 +411,14 @@ function textForClipId(id) {
   return '';
 }
 
+// KAY-FUN (gay + Trash-Talk): dafuer gibt es NOCH KEINE Clips in den Sets.
+// Bewusste Ausnahme vom Stimm-Mix-Verbot: Diese Phrasen laufen IMMER ueber die
+// Geraetestimme (laut), bis Clips generiert wurden — dann Flag hier entfernen.
+const FUN_TTS = /^(ph-gay|ph-low-[1-5])$/;
+
 function enqueueSequence(seq, { prio = 1, replace = false } = {}) {
   if (!settings.enabled) return;
-  enqueue(seq.map(s => ({ clipId: s.clipId, urls: clipCandidatesForId(s.clipId), gapBeforeMs: s.gapBeforeMs || 0, volume: s.volume, playMs: s.playMs, text: textForClipId(s.clipId), prio })), { replace });
+  enqueue(seq.map(s => ({ clipId: s.clipId, urls: clipCandidatesForId(s.clipId), gapBeforeMs: s.gapBeforeMs || 0, volume: s.volume, playMs: s.playMs, text: textForClipId(s.clipId), prio, tts: FUN_TTS.test(s.clipId) })), { replace });
 }
 
 // ---------- High-Level ----------
@@ -396,8 +451,9 @@ export function callDart(thr) {
   enqueueSequence([{ clipId: 'seg-' + segCode, gapBeforeMs: 220 }], { prio: 0 });
 }
 
-// Visit-Ende: voller require-Satz + Checkout-Weg (Kays Sequenz) — ersetzt Wartendes
-export function callVisitEnd(rest, { forMatch = false, bust = false, visit180 = false, visitHigh = null, labels = [] } = {}) {
+// Visit-Ende: Summen-Ansage (KAY: NUR nach dem 3. Dart, nie einzeln) + voller
+// require-Satz + Checkout-Weg — ersetzt Wartendes
+export function callVisitEnd(rest, { forMatch = false, bust = false, visit180 = false, visitHigh = null, labels = [], points = null } = {}) {
   if (!settings.enabled) return;
   let coId = null;
   if (settings.checkout && rest >= 2 && rest <= 170) {
@@ -408,7 +464,7 @@ export function callVisitEnd(rest, { forMatch = false, bust = false, visit180 = 
         : ('co-' + rest);
     }
   }
-  const seq = visitSequence({ labels, rest, bust, visit180, visitHigh }, coId);
+  const seq = visitSequence({ labels, rest, bust, visit180, visitHigh, points }, coId);
   trace('visitend', { rest, ids: seq.map(s => s.clipId).join(',') });
   enqueueSequence(seq, { replace: true });
 }
@@ -472,4 +528,72 @@ export function precacheList() {
   const urls = [clipUrl('phrase', 'gameshot'), clipUrl('phrase', 'bust'), clipUrl('phrase', '180'), '/caller/shared/applause.mp3'];
   for (let n = 2; n <= 170; n++) urls.push(clipUrl('rest', n));
   return urls;
+}
+
+// ---------- KAY: Clip-Vorabladen (ALLES) + Blob-Wiedergabe ohne Netz ----------
+const CLIP_CACHE = 'dartpro-clips-v1';
+const blobUrls = new Map();
+let warmState = { done: 0, total: 0, running: false };
+
+export function warmClipProgress() {
+  return { done: warmState.done, total: warmState.total, running: warmState.running };
+}
+
+export function fullClipList() {
+  const set = settings.voiceSet || 'elevenlabs-brian';
+  if (set === DEVICE_SET) return [];
+  const lang = settings.lang === 'de' ? 'de' : 'en';
+  const urls = ['/caller/shared/applause.mp3'];
+  for (let n = 2; n <= 501; n++) urls.push('/caller/' + set + '/' + lang + '/rest-' + n + '.mp3');
+  for (let n = 2; n <= 170; n++) if (![159, 162, 163, 165, 166, 168, 169].includes(n)) urls.push('/caller/' + set + '/' + lang + '/co-' + n + '.mp3');
+  for (let d = 1; d <= 20; d++) for (const suf of ['', '-match', '-game']) urls.push('/caller/' + set + '/' + lang + '/dx-D' + d + suf + '.mp3');
+  urls.push('/caller/' + set + '/' + lang + '/dx-Bull.mp3', '/caller/' + set + '/' + lang + '/dx-Bull-match.mp3', '/caller/' + set + '/' + lang + '/dx-Bull-game.mp3');
+  for (let n = 0; n <= 180; n++) urls.push('/caller/' + set + '/' + lang + '/sc-' + n + '.mp3');
+  urls.push('/caller/' + set + '/' + lang + '/seg-miss.mp3', '/caller/' + set + '/' + lang + '/seg-bull.mp3', '/caller/' + set + '/' + lang + '/seg-25.mp3');
+  for (let n = 1; n <= 20; n++) for (const k of ['s', 'd', 't']) urls.push('/caller/' + set + '/' + lang + '/seg-' + k + n + '.mp3');
+  for (const ph of ['gameshot', 'set', 'perf', 'gameshot-1', 'gameshot-2', 'gameshot-3', 'gameshot-high', 'bust', '180', 'mugsaway', 'bigfish', 'match']) urls.push('/caller/' + set + '/' + lang + '/ph-' + ph + '.mp3');
+  for (let n = 100; n <= 179; n++) urls.push('/caller/' + set + '/' + lang + '/visit-' + n + '.mp3');
+  return urls;
+}
+
+async function cacheHitAny(url) {
+  try {
+    for (const k of await caches.keys()) {
+      const hit = await (await caches.open(k)).match(url);
+      if (hit) return hit;
+    }
+  } catch (e) { /* egal */ }
+  return null;
+}
+
+export function stopWarmClipCache() { warmState.running = false; }
+
+// Blob-objectURLs fuer konkrete Clips vorwaermen (instant Start nach dem Warmup)
+export async function prewarmBlobs(urls) {
+  for (const url of urls) {
+    if (blobUrls.has(url)) continue;
+    try {
+      const hit = await cacheHitAny(url);
+      if (hit) blobUrls.set(url, URL.createObjectURL(await hit.blob()));
+    } catch (e) { /* egal */ }
+  }
+}
+
+export function warmClipCache(maxParallel = 6) {
+  if (warmState.running || typeof caches === 'undefined' || typeof fetch === 'undefined') return;
+  const urls = fullClipList();
+  warmState = { done: 0, total: urls.length, running: true };
+  let idx = 0;
+  const worker = async () => {
+    while (idx < urls.length && warmState.running) {
+      const u = urls[idx++];
+      try {
+        const hit = await cacheHitAny(u);
+        if (!hit) await fetch(u, { cache: 'reload' }); // Service Worker legt in den Clip-Cache
+      } catch (e) { /* Netz weg — naechster Warmup wiederholt */ }
+      warmState.done++;
+    }
+    warmState.running = false;
+  };
+  for (let i = 0; i < Math.max(1, maxParallel); i++) worker();
 }

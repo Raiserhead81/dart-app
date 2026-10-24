@@ -71,6 +71,22 @@ export function buildCallerSentences() {
   out['en/ph-bigfish'] = 'BIG FISH!! ONE HUNDRED AND SEVENTY!!';
   out['en/ph-gameshot-high'] = 'GAME SHOT!!';
   out['en/ph-match'] = 'Game, set and match!!';
+  out['en/ph-gameshot'] = 'Game shot!';
+  out['en/ph-bust'] = 'No score!';
+
+  // KAY-FUN: 1+5+20 = "GAAAY!!" (statt Summe 26) + Trash-Talk bei Visit < 10
+  out['en/ph-gay'] = 'GAAAY!!';
+  out['de/ph-gay'] = 'GAAAY!!';
+  out['en/ph-low-1'] = 'You call that darts?! Appalling!';
+  out['en/ph-low-2'] = 'Absolutely dreadful!';
+  out['en/ph-low-3'] = 'Shocking! Simply shocking!';
+  out['en/ph-low-4'] = 'Embarrassing. Truly embarrassing!';
+  out['en/ph-low-5'] = 'My grandmother throws better than you!';
+  out['de/ph-low-1'] = 'Das soll Darts sein?! Grauenhaft!';
+  out['de/ph-low-2'] = 'Absolut grausig!';
+  out['de/ph-low-3'] = 'Schockierend! Einfach schockierend!';
+  out['de/ph-low-4'] = 'Peinlich. Wirklich peinlich!';
+  out['de/ph-low-5'] = 'Meine Oma wirft besser als du!';
   out['de/ph-gameshot'] = 'Game Shot!';
   out['de/ph-bust'] = 'Kein Score!';
 

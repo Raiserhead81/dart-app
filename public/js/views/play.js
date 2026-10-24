@@ -10,7 +10,7 @@ import { suggestCheckout } from '/js/core/checkout.js';
 import { addGame } from '/js/core/storage.js';
 import { buildBoard } from '/js/board.js';
 import { el, icon, toast, uid } from '/js/util.js';
-import { callDart, callVisitEnd, callGameShot, callSetWon, callWhatPerformance, callDoubleRequired, callBigFish, clearQueue, flushPending, callerBusyMs, callerSettings, preloadForRest, unlockAudio, warmAudioPool } from '/js/caller-voice.js';
+import { callDart, callVisitEnd, callGameShot, callSetWon, callWhatPerformance, callDoubleRequired, callBigFish, clearQueue, flushPending, callerBusyMs, callerSettings, preloadForRest, unlockAudio, warmAudioPool, warmClipCache, warmClipProgress } from '/js/caller-voice.js';
 import { newRecordsBroken } from '/js/core/records.js';
 import { turnHoldMs } from '/js/core/turnhold.js';
 import { padThrow, padSpecial, pushSnapshot, popSnapshot, checkoutLine, HAPTIC } from '/js/core/pad.js';
@@ -113,18 +113,35 @@ function renderSetup(view) {
       store.state.settings.lastSetsTo = sel.setsTo;
       store.save();
       window.__DARTPRO_SESSION_ACTIVE = true;
+      // KAY-NEU: Auto-Fullscreen im selben Tap (Geste-Constraint) — ohne Browserleiste
+      try {
+        const standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+        if (!standalone && !document.fullscreenElement && document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+      } catch (e) { /* egal */ }
       // iOS-PWA: Audio-Element-Pool JETZT (in der User-Geste) vorbereiten, damit
       // mitten im Spiel kein Element mehr erzeugt/entsperrt werden muss -> keine
       // abgeschnittenen Clips, Reihenfolge 100%.
       unlockAudio();
       warmAudioPool(6);
+      warmClipCache(6); // KAY: ALLE Caller-Clips vorab in den Browser-Cache
       if (sel.mode === 'x01') preloadForRest(sel.start);
       rerender();
     }
   }, icon('i-plus'), 'Spiel starten');
 
+  const warmLine = el('p', { class: 'kicker', id: 'clipwarm', style: 'margin:6px 0 0;font-size:11px' }, '');
+  (function tickWarm() {
+    const w = warmClipProgress();
+    if (!w.running && w.total === 0) { import('/js/caller-voice.js').then(m => m.warmClipCache(6)).catch(() => {}); }
+    warmLine.textContent = w.running ? 'Caller wird geladen \u2026 ' + Math.round(w.done / Math.max(1, w.total) * 100) + ' %' : '';
+    if (w.running) setTimeout(tickWarm, 500);
+  })();
+
   view.append(
     el('p', { class: 'kicker' }, 'Spielen'),
+    warmLine,
     el('h1', { class: 'display', style: 'margin:0 0 14px' }, 'Neues Spiel'),
     el('div', { class: 'panel' },
       el('h2', {}, 'Modus'),
@@ -176,6 +193,17 @@ function renderX01Game(view) {
 
   paintGame(view, session);
   buildPad(view, session);
+
+  // KAY-NEU: laufendes Spiel fortgesetzt -> erster Tap im Spiel holt Vollbild (Geste noetig)
+  if (!window.matchMedia?.('(display-mode: standalone)').matches) {
+    view.addEventListener('pointerdown', () => {
+      try {
+        if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {});
+        }
+      } catch (e) { /* egal */ }
+    }, { once: true });
+  }
 }
 
 /* ---- Pad: Tap zaehlt SOFORT ---- */
@@ -348,9 +376,9 @@ function doThrow(session, t, { rerenderView } = {}) {
     flashBig('180', 'one80', 'ONE HUNDRED AND EIGHTY!');
   } else if (visitPoints >= 100 && visitDartsNow === 3) {
     flashBig(String(visitPoints), 'hundreds');
-  } else {
-    callDart({ k: t.k, n: t.n, v: ev.throw.v });
   }
+  // KAY: KEINE Einzel-Dart-Ansage mehr — der Caller spricht erst nach dem 3. Dart
+  // die Summe (siehe callVisitEnd / visitSequence).
 
   if (ev.type === 'ok') {
     const restNow = st.leg.remaining[st.current];
@@ -361,12 +389,10 @@ function doThrow(session, t, { rerenderView } = {}) {
   if (ev.type === 'turn' || ev.type === 'noin' || ev.type === 'bust' || ev.type === 'leg' || ev.type === 'match') {
     const visit180 = visitPoints === 180 && !ev.type.includes('bust');
     const visitHigh = (visitPoints >= 100 && visitPoints < 180) ? visitPoints : null;
-    // DOPPEL-FIX: bei "Wurfpunkte je Dart" wurden Dart 1+2 schon EINZELN gesagt —
-    // die Visit-Sequenz wiederholt nur noch den LETZEN Dart, dann Rest/Weg. Bei
-    // dartCalls aus: volle Visit-Sequenz mit allen drei Segmenten (Kays Timing).
-    const labels = callerSettings().dartCalls ? session.visitLabels.slice(-1) : session.visitLabels;
+    // KAY: volle Visit-Labels (Gay-Check 1+5+20) + Summe — Einzel-Segmente werden
+    // nicht mehr angesagt, nur die Summe nach dem 3. Dart.
     callVisitEnd(st.leg.remaining[p] === 0 && ev.type !== 'match' ? 0 : st.leg.remaining[st.current] ?? restAfter, {
-      forMatch, bust: ev.type === 'bust', visit180, visitHigh, labels
+      forMatch, bust: ev.type === 'bust', visit180, visitHigh, labels: session.visitLabels, points: visitPoints
     });
     session.visitLabels = [];
   }
@@ -575,7 +601,7 @@ function renderCricketGame(view) {
 function fireCricket(session, t, view) {
   buzz(HAPTIC.tap);
   pushSnapshot(session.snapshots, session.state);
-  clearQueue();
+  flushPending(); // einmal gestartete Clips nie mitten drin stoppen
   const st = session.state;
   const ev = applyCricketDart(st, t);
   callDart({ k: t.k, n: t.n, v: t.v });
