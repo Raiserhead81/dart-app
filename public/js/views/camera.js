@@ -24,6 +24,7 @@ function frameGrab() {
 export function findeNeuenPfeil(a, b) { setEngineCal(cal); return _finde(a, b, cal); }
 
 export async function startCam(deviceId) {
+  if (!deviceId) { try { deviceId = localStorage.getItem('dartpro.camera.lens') || null; } catch (e) {} } // gespeicherte Weitwinkel-Linse
   if (stream) { // Stream laeuft evtl. schon (alter View) -> NEUES Video anbinden!
     video.srcObject = stream;
     try { await video.play(); } catch (e) {}
@@ -177,9 +178,10 @@ export function renderCamera(view) {
           class: 'chip', onclick: async (e) => {
             [...lensRow.children].forEach(c => c.classList.remove('on'));
             e.currentTarget.classList.add('on');
+            localStorage.setItem('dartpro.camera.lens', d.deviceId); // KAY: Linse merken - SPIEL nutzt sie ab sofort
             stopCam();
             const ok = await startCam(d.deviceId);
-            status.textContent = ok ? 'Linse ' + (i + 1) + ' aktiv - kalibriere neu!' : 'Linse ' + (i + 1) + ' ging nicht';
+            status.textContent = ok ? 'Linse ' + (i + 1) + ' gespeichert - Spiel nutzt sie jetzt!' : 'Linse ' + (i + 1) + ' ging nicht';
           }
         }, 'Linse ' + (i + 1)));
       });
