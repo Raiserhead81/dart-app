@@ -25,6 +25,11 @@ describe('Caller-Sequenz (Kays Timing)', () => {
     expect(seq.map(s => s.clipId)).toEqual(['ph-gay', 'rest-26']);
   });
 
+  it('KAY: 3xT20 = 180-AUSRUF AUCH beim Bust (Rest 180, kein Doppel-Ende)', () => {
+    const seq = visitSequence({ labels: ['t20', 't20', 't20'], rest: 180, bust: true, points: 0, visit180: true });
+    expect(seq.map(s => s.clipId)).toEqual(['ph-180', 'rest-180']);
+  });
+
   it('KAY: Visit unter 10 => Summe + Beleidigung (5 Varianten rotierend)', () => {
     const seq = visitSequence({ labels: ['s3', 's2', 's1'], rest: 444, points: 6 });
     expect(seq.map(s => s.clipId)).toEqual(['sc-6', 'ph-low-1', 'rest-444']);

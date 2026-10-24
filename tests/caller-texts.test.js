@@ -48,7 +48,7 @@ describe('Caller-Satzliste: rest-Komplettbereich 2..501', () => {
     expect(sentences['en/dx-Bull']).toBe('You require bullseye');
     expect(sentences['en/sc-180']).toBe('one hundred and eighty');
     expect(sentences['en/seg-t20']).toBe('treble twenty');
-    expect(sentences['en/ph-bust']).toBe('No score!');
+    expect(sentences['en/ph-bust']).toBe('BUST!'); // KAY: BUST statt No score (24.10.)
     expect(sentences['en/ph-gameshot']).toBe('Game shot!');
     expect(sentences['en/ph-bigfish']).toBe('BIG FISH!! ONE HUNDRED AND SEVENTY!!');
     expect(sentences['en/ph-gameshot-high']).toBe('GAME SHOT!!');

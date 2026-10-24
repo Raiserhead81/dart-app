@@ -66,14 +66,14 @@ export function buildCallerSentences() {
   out['en/ph-gameshot-1'] = 'Game shot! One leg to play.';
   out['en/ph-gameshot-2'] = 'Game shot! Two legs to play.';
   out['en/ph-gameshot-3'] = 'Game shot! Three legs to play.';
-  out['en/ph-bust'] = 'No score!';
+  out['en/ph-bust'] = 'BUST!';
   out['en/ph-180'] = 'ONE HUNDRED AND EIGHTY!';
   out['en/ph-mugsaway'] = 'Mugs away!';
   out['en/ph-bigfish'] = 'BIG FISH!! ONE HUNDRED AND SEVENTY!!';
   out['en/ph-gameshot-high'] = 'GAME SHOT!!';
   out['en/ph-match'] = 'Game, set and match!!';
   out['en/ph-gameshot'] = 'Game shot!';
-  out['en/ph-bust'] = 'No score!';
+  out['en/ph-bust'] = 'BUST!';
 
   // KAY-FUN (final, 24.10.): 1+5+20 = "GAAAY!!" + Trash-Talk bei Visit < 10
   // (Claudio... nein: Gemini-Stimme Charon, strikte Prompts, von Kay abgehört+abgesegnet)
@@ -90,7 +90,9 @@ export function buildCallerSentences() {
   out['de/ph-low-4'] = 'Peinlich. Wirklich peinlich!';
   out['de/ph-low-5'] = 'Meine Oma wirft besser als du!';
   out['de/ph-gameshot'] = 'Game Shot!';
-  out['de/ph-bust'] = 'Kein Score!';
+  out['en/ph-din'] = 'BUST! You need a double to start!';
+  out['de/ph-din'] = 'BUST! Du brauchst ein Doppel zum Start!';
+  out['de/ph-bust'] = 'BUST!';
 
   return out;
 }

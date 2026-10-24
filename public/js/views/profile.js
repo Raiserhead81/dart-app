@@ -123,7 +123,7 @@ export function renderProfile(view) {
             box.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
             e.currentTarget.classList.add('on');
           }
-        }, s.label + (s.provider === 'elevenlabs' ? '  · Premium' : '')),
+        }, s.label + (s.complete === false ? '  · läuft noch ein' : '') + (s.provider === 'elevenlabs' ? '  · Premium' : '')),
         el('button', { class: 'btn small ghost', onclick: () => m.previewSet(s.id) }, 'Anhören')
       ));
     }

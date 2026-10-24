@@ -15,15 +15,18 @@ export const GAP_APPLAUSE = 200;
 // Summe 1..9 = Trash-Talk (Beleidigung), 100..179 = euphorischer visit-Clip.
 // checkout: { clipId: 'co-96'|'dx-D16-match', } | null
 export function visitSequence(visit, checkoutClipId = null) {
-  const { labels = [], rest, bust = false, visit180 = false, points = null } = visit;
+  const { labels = [], rest, bust = false, visit180 = false, noin = false, points = null } = visit;
   const seq = [];
-  // KAY: 1+5+20 = GAAAY — IMMER, auch beim Bust (hat Vorrang vor No score)
+  // KAY: Die MOMENTE gewinnen — 1+5+20 = GAAAY und 3xT20 = 180 IMMER, auch beim Bust.
+  // Double-In ohne Start-Doppel: KLARE Ansage statt lapidarem 'No score'.
   if (isGayVisit(labels)) {
     seq.push({ clipId: 'ph-gay', gapBeforeMs: 0 });
-  } else if (bust) {
-    seq.push({ clipId: 'ph-bust', gapBeforeMs: 0 });
+  } else if (noin) {
+    seq.push({ clipId: 'ph-din', gapBeforeMs: 0 });
   } else if (visit180) {
     seq.push({ clipId: 'ph-180', gapBeforeMs: 0 });
+  } else if (bust) {
+    seq.push({ clipId: 'ph-bust', gapBeforeMs: 0 });
   } else {
     if (points != null && points >= 100 && points <= 179) seq.push({ clipId: 'visit-' + points, gapBeforeMs: 0 });
     else if (points != null) seq.push({ clipId: 'sc-' + points, gapBeforeMs: 0 });

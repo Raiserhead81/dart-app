@@ -409,6 +409,7 @@ function textForClipId(id) {
   if ((m = id.match(/^sc-(\d+)$/))) return numberToCallerWords(+m[1], settings.lang);
   if ((m = id.match(/^visit-(\d+)$/))) return throwCallerWords({ k: 'sum', v: +m[1] }, settings.lang) + '!!';
   if (id === 'ph-180') return 'One hundred and eighty!';
+  if (id === 'ph-din') return settings.lang === 'de' ? 'BUST! Du brauchst ein Doppel zum Start!' : 'BUST! You need a double to start!';
   if (id === 'ph-gay') return 'GAAAY!!';
   if ((m = id.match(/^ph-low-([1-5])$/))) {
     const LOW_EN = ['You call that darts?! Appalling!', 'Absolutely dreadful!', 'Shocking! Simply shocking!', 'Embarrassing. Truly embarrassing!', 'My grandmother throws better than you!'];
@@ -417,7 +418,7 @@ function textForClipId(id) {
   }
   if (id === 'ph-set') return 'Set!';
   if (id === 'ph-perf') return 'What a performance!';
-  if (id === 'ph-bust') return settings.lang === 'de' ? 'Kein Score!' : 'No score!';
+  if (id === 'ph-bust') return 'BUST!';
   if (id === 'ph-match') return 'Game, set and match!';
   if (id === 'ph-bigfish') return 'Big fish!';
   if (id === 'ph-gameshot-high') return gameShotCallerWords(settings.lang);
@@ -429,7 +430,7 @@ function textForClipId(id) {
 // KAY-FUN (gay + Trash-Talk): Clips wurden per Gemini-TTS generiert und liegen in
 // den Sets. FALLBACK-Regel: Fehlt der Clip in einem Set (404/missing), spricht die
 // GERAETSTIMME den Text — bewusste Ausnahme vom Stimm-Mix-Verbot, nie Stille.
-const FUN_TTS = /^(ph-gay|ph-low-[1-5])$/;
+const FUN_TTS = /^(ph-gay|ph-low-[1-5]|ph-din|ph-bust)$/; // ph-bust: bis BUST-Clips generiert sind (Gemini-Limit 24.10.)
 
 function enqueueSequence(seq, { prio = 1, replace = false } = {}) {
   if (!settings.enabled) return;
@@ -468,7 +469,7 @@ export function callDart(thr) {
 
 // Visit-Ende: Summen-Ansage (KAY: NUR nach dem 3. Dart, nie einzeln) + voller
 // require-Satz + Checkout-Weg — ersetzt Wartendes
-export function callVisitEnd(rest, { forMatch = false, bust = false, visit180 = false, visitHigh = null, labels = [], points = null } = {}) {
+export function callVisitEnd(rest, { forMatch = false, bust = false, visit180 = false, visitHigh = null, labels = [], points = null, noin = false } = {}) {
   if (!settings.enabled) return;
   let coId = null;
   if (settings.checkout && rest >= 2 && rest <= 170) {
@@ -479,7 +480,7 @@ export function callVisitEnd(rest, { forMatch = false, bust = false, visit180 = 
         : ('co-' + rest);
     }
   }
-  const seq = visitSequence({ labels, rest, bust, visit180, visitHigh, points }, coId);
+  const seq = visitSequence({ labels, rest, bust, visit180, visitHigh, points, noin }, coId);
   trace('visitend', { rest, ids: seq.map(s => s.clipId).join(',') });
   enqueueSequence(seq, { replace: true });
 }

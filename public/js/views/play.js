@@ -400,8 +400,9 @@ function doThrow(session, t, { rerenderView } = {}) {
     const visitHigh = (visitPoints >= 100 && visitPoints < 180) ? visitPoints : null;
     // KAY: volle Visit-Labels (Gay-Check 1+5+20) + Summe — Einzel-Segmente werden
     // nicht mehr angesagt, nur die Summe nach dem 3. Dart.
+    // KAY: BUST-Ansage bei Double-In ohne Start-Doppel (statt lapidarem No score)
     callVisitEnd(st.leg.remaining[p] === 0 && ev.type !== 'match' ? 0 : st.leg.remaining[st.current] ?? restAfter, {
-      forMatch, bust: ev.type === 'bust', visit180, visitHigh, labels: session.visitLabels, points: visitPoints
+      forMatch, bust: ev.type === 'bust', visit180, visitHigh, labels: session.visitLabels, points: visitPoints, noin: !st.leg.started[p]
     });
     session.visitLabels = [];
   }
