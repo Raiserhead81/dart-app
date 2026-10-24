@@ -241,6 +241,8 @@ function renderX01Game(view) {
       const vg = document.querySelector('.view-game');
       if (vg) { vg.style.paddingTop = 'calc(55vh + 10px)'; vg.style.minHeight = '0'; vg.style.height = 'auto'; }
       const quit = el('button', { class: 'gbtn danger', style: 'position:absolute;top:8px;right:8px;z-index:5', onclick: () => endEarly() }, 'Beenden');
+      const camHinweis = el('div', { style: 'position:absolute;bottom:10px;left:50%;transform:translateX(-50%);background:rgba(7,11,9,.92);border:1px solid var(--green);padding:10px 22px;border-radius:12px;font-size:16px;font-weight:900;color:#fff;z-index:5;letter-spacing:.04em;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.6);animation:camPulse 1.2s ease-in-out infinite' }, '👆 TIPP JETZT auf deinen Treffer');
+      h.append(camHinweis);
       const recLabel = el('span', {}, 'Rec');
       const rec = el('button', { class: 'gbtn', style: 'position:absolute;top:8px;right:86px;z-index:5', onclick: async () => {
         const zustand = await toggleAufnahme((size) => { recLabel.textContent = 'Rec'; window.__recInfo = 'fertig ' + (size / 1e6).toFixed(1) + 'MB'; });
@@ -262,7 +264,11 @@ function renderX01Game(view) {
       const v = document.querySelector('#camhost video');
       if (v) tapEingabeAnbinden(v, (seg) => {
         firePad(session, view, () => makeThrow(seg.k === 'outer' ? 'outer' : seg.k, seg.n));
-      }, () => toast('Erst kalibrieren: TIPPE Bull-Mitte, dann untere Doppelkante'));
+        camHinweis.textContent = '✓ ' + seg.label + ' GESPEICHERT';
+        camHinweis.style.animation = 'none';
+        camHinweis.style.borderColor = 'var(--gold)';
+        setTimeout(() => { camHinweis.textContent = '👆 TIPP JETZT auf deinen Treffer'; camHinweis.style.animation = ''; camHinweis.style.borderColor = 'var(--green)'; }, 1300);
+      }, () => { camHinweis.textContent = 'KALIBRIEREN: TIPPE Bull-Mitte, dann untere Doppelkante'; });
     }, 900);
   }
   view.append(el('div', { id: 'bigevent' }), el('div', { id: 'boardoverlay' }));
