@@ -151,22 +151,23 @@ export function renderStats(view, arg) {
   const avgs = trend.map(t => t.stats.avg3 || 0);
   const maxA = Math.max(10, ...avgs);
   const bestIdx = avgs.indexOf(Math.max(...avgs));
-  const bars = el('div', { class: 'weekbars' },
+  const withData = trend.filter(t => t.stats.darts > 0);
+  const bars = el('div', { class: 'weekbars' + (withData.length < 2 ? ' few' : '') },
     ...trend.map((t, i) => {
-      const v = t.stats.avg3 || 0;
-      const h = Math.max(3, Math.round(v / maxA * 100));
+      const v = t.stats.darts > 0 ? (t.stats.avg3 || 0) : 0;
+      const h = v > 0 ? Math.max(12, Math.round(v / maxA * 100)) : 2;
       return el('div', { class: 'weekbar' + (i === trend.length - 1 && v > 0 ? ' now' : '') + (i === bestIdx && v > 0 ? ' best' : ''), style: `height:${h}%`, title: `${t.label}: Ø ${String(Math.round(v)).replace('.', ',')}` },
         el('span', { class: 'wv' }, v > 0 ? String(Math.round(v)) : ''),
         el('span', { class: 'wl' }, t.label.replace(/[^0-9]/g, '').slice(-2)));
     }));
   view.append(el('div', { class: 'darkpanel' },
-    el('h2', {}, 'Verlauf · 12 Wochen', el('span', { class: 'sub' }, '3-Dart-Ø je Kalenderwoche')),
+    el('h2', {}, 'Verlauf', el('span', { class: 'sub' }, withData.length < 2 ? 'ab Woche 2 waechst dein Verlauf' : '3-Dart-Ø je Kalenderwoche')),
     bars,
     el('div', { class: 'legend' },
       el('span', {}, el('i', { class: 'sw', style: 'background:linear-gradient(180deg,#ffd479,#d9a441)' }), 'Beste Woche'),
       el('span', {}, el('i', { class: 'sw', style: 'background:rgba(255,107,87,.9)' }), 'Aktuell')),
     el('div', { class: 'weekgrid mt' },
-      ...trend.slice().reverse().filter(t => t.stats.darts > 0).map(t => el('div', { class: 'weekrow' },
+      ...trend.slice().reverse().filter(t => t.stats.darts > 0).slice(0, 4).map(t => el('div', { class: 'weekrow' },
         el('div', { class: 'wk' }, t.label),
         el('div', { class: 'txt' }, weekSummaryText(t)),
         badge(t.delta?.avg),
