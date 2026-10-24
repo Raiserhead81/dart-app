@@ -67,16 +67,19 @@ export function renderStats(view, arg) {
         el('div', { class: 'hero-num' }, fmt(stats.avg3)),
         el('div', { class: 'hero-sub' }, '3-Dart-Avg'), el('div', { style: 'margin-top:6px' }, badge(delta?.avg))
       ),
+      // KAY: 180er statt Checkout% als zweite Hero-Zahl — 100% Checkout bei 1
+      // Versuch als Riesenzahl war irrefuehrend; Checkout% mit Versuchen in die Minis.
       el('div', { class: 'hero-kpi gold' },
-        el('div', { class: 'hero-num' }, pct(stats.checkout.pct)),
-        el('div', { class: 'hero-sub' }, 'Checkout %'), el('div', { style: 'margin-top:6px' }, badge(delta?.checkout))
+        el('div', { class: 'hero-num' }, String(stats.counts.c180)),
+        el('div', { class: 'hero-sub' }, '180er'),
+        el('div', { style: 'margin-top:6px;font-size:11px;font-weight:800;color:var(--muted)' }, stats.counts.c180 ? 'MAXIMUM!' : 'noch keiner')
       )
     ),
     el('div', { class: 'herominis' },
       ...[
         ['First 9', fmt(stats.first9)],
         ['Doppel %', pct(stats.doubles.pct)],
-        ['180er', String(stats.counts.c180)],
+        ['Checkout', `${pct(stats.checkout.pct)} (${stats.checkout.hits}/${stats.checkout.attempts})`],
         ['T20 %', stats.t20.pct != null ? fmt(stats.t20.pct) : '-'],
         ['Darts/Leg', fmt(stats.dartsPerLeg)],
         ['Legs', `${stats.legsWon}/${stats.legsPlayed}`],
