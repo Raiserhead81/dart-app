@@ -183,6 +183,26 @@ function renderX01Game(view) {
     el('span', { class: 'spacer' }),
     el('button', { class: 'gbtn', onclick: () => undo(session), title: 'Undo' }, icon('i-undo'), el('span', { class: 'hide-sm' }, 'Undo')),
     session.useBoard ? el('button', { class: 'gbtn', onclick: () => showBoardOverlay(session) }, icon('i-target'), el('span', { class: 'hide-sm' }, 'Scheibe')) : '',
+    el('button', { class: 'gbtn' + (session.useCamera ? ' danger' : ''), id: 'camtoggle', onclick: (e) => {
+      session.useCamera = !session.useCamera;
+      store.save();
+      if (session.useCamera) {
+        const host = document.getElementById('camhost') || (() => { const h = el('div', { id: 'camhost', style: 'order:-1' }); document.querySelector('.view-game').prepend(h); return h; })();
+        mountCam(host, (seg) => {
+          const korrektur = el('div', { style: 'position:fixed;left:50%;transform:translateX(-50%);bottom:86px;z-index:60;background:var(--red-deep);border:1px solid var(--red);border-radius:12px;padding:10px 16px;font-weight:900;font-size:14px;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.5)' },
+            el('span', {}, `${seg.label} GEZÄHLT — falsch? `),
+            el('button', { class: 'btn small', onclick: () => { korrektur.remove(); undo(session); toast('Zurückgenommen - bitte manuell tippen'); } }, 'korrigieren'));
+          document.body.append(korrektur);
+          setTimeout(() => korrektur.remove(), 3000);
+          firePad(session, document.getElementById('view'), () => makeThrow(seg.k === 'outer' ? 'outer' : seg.k, seg.n));
+        });
+        e.currentTarget.classList.add('danger');
+      } else {
+        unmountCam();
+        const h = document.getElementById('camhost'); if (h) h.remove();
+        e.currentTarget.classList.remove('danger');
+      }
+    }, title: 'Kamera zählt selbst' }, icon('i-target'), el('span', { class: 'hide-sm' }, session.useCamera ? 'Kamera AUS' : 'Kamera')),
     matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches ? '' : el('button', { class: 'gbtn', onclick: () => { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) {} }, title: 'Vollbild' }, icon('i-target'), el('span', { class: 'hide-sm' }, 'Vollbild')),
     el('button', { class: 'gbtn danger', onclick: endEarly, title: 'Spiel beenden' }, el('span', {}, 'Beenden'))
   );
