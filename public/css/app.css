@@ -487,3 +487,42 @@ button.listitem strong { color: var(--cream); }
 .weekbar.now .wv, .weekbar.best .wv { opacity: 1; }
 .weekbar.now .wv { color: #ff8d7a; }
 .weekbar.best .wv { color: #ffd479; }
+
+/* ===== STATS-REDESIGN (KAY 24.10.): EIN Guss mit dem Spielscreen =====
+   Resterklaemmertes Blau/Serif-LTHC-Design raus — Broadcast-Gruen/Creme/Gold rein. */
+.stathero, .darkpanel, .recordsec, .pbcard, .kpi {
+  background: linear-gradient(160deg, rgba(255, 255, 255, .045), transparent 46%), var(--panel) !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 16px !important;
+  color: var(--text) !important;
+  box-shadow: var(--shadow) !important;
+  text-shadow: none !important;
+}
+.recordsec { border-left: 4px solid var(--gold) !important; }
+.stathero::after { display: none !important; }
+.stathero-name { font-family: inherit !important; font-size: clamp(24px, 7vw, 32px) !important; font-weight: 900; text-transform: uppercase; letter-spacing: -.015em; color: var(--cream) !important; line-height: 1.08; }
+.stathero .kicker { color: var(--gold) !important; }
+.hero-num, .heromini .v, .reckpi .v, .pbcard .big, .bench-value, .kpi .value {
+  font-family: inherit !important; color: #fff !important;
+  font-variant-numeric: tabular-nums; font-weight: 900;
+  text-shadow: 0 2px 0 rgba(0, 0, 0, .4) !important;
+}
+.hero-kpi.red .hero-num { color: #ff8d7a !important; text-shadow: 0 0 28px rgba(255, 45, 85, .35), 0 2px 0 rgba(0, 0, 0, .4) !important; }
+.hero-kpi.gold .hero-num { color: var(--gold) !important; text-shadow: 0 0 28px rgba(232, 182, 76, .35), 0 2px 0 rgba(0, 0, 0, .4) !important; }
+.hero-kpi, .heromini, .reckpi { background: var(--panel2) !important; border: 1px solid var(--line) !important; box-shadow: none !important; }
+.hero-kpi.red { border-color: rgba(255, 45, 85, .45) !important; }
+.hero-kpi.gold { border-color: rgba(232, 182, 76, .45) !important; }
+.hero-sub, .heromini .l, .reckpi .l, .reckpi .d, .bench-label { color: var(--muted) !important; letter-spacing: .14em; }
+.darkpanel h2, .recordsec .kick, .darkpanel .muted { color: var(--cream) !important; }
+.darkpanel .muted, .recordsec .kick { opacity: .85; }
+.reckpi { border-color: rgba(232, 182, 76, .3) !important; }
+.rebadge { background: linear-gradient(135deg, var(--gold), #f0c060) !important; color: #241a10 !important; }
+.progchip { background: var(--green-deep) !important; border-color: var(--line2) !important; color: var(--cream) !important; }
+.weekbar { background: linear-gradient(180deg, rgba(70, 196, 122, .8), rgba(46, 158, 91, .25)) !important; }
+.weekbar.now { background: linear-gradient(180deg, #ff6b57, rgba(255, 45, 85, .45)) !important; }
+.weekbar.best { background: linear-gradient(180deg, var(--gold), #b3812f) !important; }
+.badge.up { background: rgba(70, 196, 122, .16) !important; color: #5fdb95 !important; }
+.badge.down { background: rgba(255, 45, 85, .14) !important; color: #ff8d7a !important; }
+.legend > span { background: var(--panel2) !important; border-color: var(--line2) !important; color: var(--cream) !important; }
+.rank-table th { color: var(--muted) !important; }
+.pbcard { background: linear-gradient(180deg, #2a1418, var(--bg2)) !important; }

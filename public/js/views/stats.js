@@ -26,7 +26,7 @@ export function renderStats(view, arg) {
       el('p', { class: 'kicker' }, 'Statistik'),
       el('div', { class: 'panel empty' },
         el('h2', {}, 'Noch keine Spiele'),
-        el('p', { class: 'muted' }, 'Spiel ein X01 oder ein Training – ab 60 Darts erscheinen die ersten belastbaren Auswertungen.'),
+        el('p', { class: 'muted' }, 'Spiel ein X01 oder ein Training – ab dem ersten Spiel zeigt die App deine Werte.'),
         el('button', { class: 'btn primary', onclick: () => { location.hash = '#/play'; } }, 'Jetzt spielen')
       )
     );
