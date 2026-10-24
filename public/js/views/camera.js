@@ -9,6 +9,28 @@ import { store } from '/js/app.js';
 import { segVonPixel as _segVonPixel, findeNeuenPfeil as _finde, setEngineCal } from '/js/core/camera-engine.js';
 
 let stream = null, video = null, canvas = null, ctx = null;
+let recorder = null, recChunks = [], recOnStop = null;
+export function aufnahmeLaeuft() { return recorder && recorder.state === 'recording'; }
+export function toggleAufnahme(fertig) {
+  return new Promise((resolve) => {
+    if (recorder && recorder.state === 'recording') { recorder.stop(); resolve('gestoppt'); return; }
+    if (!stream) { resolve('keine kamera'); return; }
+    recChunks = [];
+    try {
+      const mt = MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm';
+      recorder = new MediaRecorder(stream, { mimeType: mt });
+    } catch (e) { try { recorder = new MediaRecorder(stream); } catch (e2) { resolve('MediaRecorder fehlgeschlagen'); return; } }
+    recorder.ondataavailable = (ev) => { if (ev.data && ev.data.size) recChunks.push(ev.data); };
+    recorder.onstop = () => {
+      const blob = new Blob(recChunks, { type: 'video/webm' });
+      window.__lastRecording = blob;
+      if (fertig) fertig(blob.size);
+      resolve('gestartet-und-gestoppt ' + blob.size);
+    };
+    recorder.start(500);
+    resolve('aufnahme laeuft');
+  });
+}
 let cal = null; // {cx, cy, r}
 let baseFrame = null; // ImageData vor dem Wurf
 

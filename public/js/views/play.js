@@ -16,7 +16,7 @@ import { turnHoldMs } from '/js/core/turnhold.js';
 import { padThrow, padSpecial, pushSnapshot, popSnapshot, checkoutLine, HAPTIC } from '/js/core/pad.js';
 import { activePlayer, store, rerender } from '/js/app.js';
 import { cricketMarksTable } from '/js/views/cricket-ui.js';
-import { mountCam, unmountCam } from '/js/views/camera.js';
+import { mountCam, unmountCam, toggleAufnahme } from '/js/views/camera.js';
 
 const STARTS = [101, 170, 301, 501, 701, 1001];
 const restTickMemo = {}; // letzter Rest je Spieler — fuer den Score-Tick beim Wechsel
@@ -241,7 +241,12 @@ function renderX01Game(view) {
       const vg = document.querySelector('.view-game');
       if (vg) { vg.style.paddingTop = 'calc(55vh + 10px)'; vg.style.minHeight = '0'; vg.style.height = 'auto'; }
       const quit = el('button', { class: 'gbtn danger', style: 'position:absolute;top:8px;right:8px;z-index:5', onclick: () => endEarly() }, 'Beenden');
-      h.append(quit);
+      const recLabel = el('span', {}, 'Rec');
+      const rec = el('button', { class: 'gbtn', style: 'position:absolute;top:8px;right:86px;z-index:5', onclick: async () => {
+        const zustand = await toggleAufnahme((size) => { recLabel.textContent = 'Rec'; window.__recInfo = 'fertig ' + (size / 1e6).toFixed(1) + 'MB'; });
+        recLabel.textContent = zustand === 'aufnahme laeuft' ? 'STOP' : 'Rec';
+      } }, recLabel);
+      h.append(rec, quit);
       return h;
     })();
     mountCam(camHost, (seg) => {
