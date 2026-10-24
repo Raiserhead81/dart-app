@@ -146,59 +146,34 @@ export function analyseBoardInFrame(img) {
   }
   rand.sort((a, b) => a - b);
   const r = rand.length >= 12 ? rand[Math.floor(rand.length / 2)] : rEst0;
-  // ROTATION (nach Bachelorarbeit: Sektorgrenzen ueber Farbwechsel): Der 20er ist
-  // der SCHWARZE Sektor im Single-Ring. Wir scannen den Kreis bei 0.85r und finden
-  // die Mitte der schwarzen Region => Drehwinkel der Kamera.
-  const farbeBei = (winkel, f) => {
-    const x = Math.round(cx + Math.cos(winkel) * r * f), y = Math.round(cy + Math.sin(winkel) * r * f);
-    if (x < 0 || y < 0 || x >= W || y >= H) return '?';
-    const i = (y * W + x) * 4;
-    const [h, sv, vv] = rgb2hsv(D[i] * 255 / maxR, D[i + 1] * 255 / maxG, D[i + 2] * 255 / maxB);
-    if (sv < 0.25 && vv < 0.30) return 'S';   // schwarz
-    if (sv < 0.20 && vv >= 0.55) return 'W';  // weiss
-    if ((h < 25 || h > 335) && sv > 0.30) return 'R';
-    if (h > 80 && h < 170 && sv > 0.22) return 'G';
-    return '.';
-  };
-  // Drei Single-Radien abstimmen (0.75/0.82/0.88) fuer Robustheit
-  let schwarzStimmen = new Array(72).fill(0);
-  for (const f of [0.75, 0.82, 0.88]) {
-    for (let k = 0; k < 72; k++) {
-      const w = (k / 72) * 2 * Math.PI - Math.PI / 2; // 0 = oben
-      if (farbeBei(w, f) === 'S') schwarzStimmen[k]++;
+  // ROTATION per PHASEN-KORRELATION: Signal = Schwarz(+1)/Weiss(-1) entlang des
+  // Single-Rings; ideal = 20er schwarz zentriert oben, alle 36 Grad. Der Versatz
+  // mit der hoechsten Korrelation = Kamera-Drehung. Robust: nutzt alle 20 Sektoren.
+  const signal = new Array(360).fill(0);
+  const signCount = new Array(360).fill(0);
+  for (let t = 0; t < 360; t++) {
+    const rad = (t - 90) * Math.PI / 180; // 0 = oben
+    for (const f of [0.72, 0.80, 0.87]) {
+      const x = Math.round(cx + Math.cos(rad) * r * f), y = Math.round(cy + Math.sin(rad) * r * f);
+      if (x < 0 || y < 0 || x >= W || y >= H) continue;
+      const i = (y * W + x) * 4;
+      const [h, sv, vv] = rgb2hsv(D[i] * 255 / maxR, D[i + 1] * 255 / maxG, D[i + 2] * 255 / maxB);
+      if (sv < 0.25 && vv < 0.35) { signal[t] += 1; signCount[t]++; }
+      else if (sv < 0.25 && vv > 0.55) { signal[t] -= 1; signCount[t]++; }
     }
   }
-  // zusammenhaengende Region mit max Stimmen suchen (Ring-Puffer, 20er ~ 18grad = 3.6 Segmente)
-  // ALLE schwarzen Ketten sammeln (Ring-wrap-sicher), jede Mitte via
-  // Einheitsvektor-Phasenmittelung. Der 20er ist die Kette AM NAECHSTEN OBEN
-  // (0 Grad) — die Kamera haengt praktisch nie ueber 30 Grad schief.
-  const ketten = [];
-  let aktuell = null;
-  for (let k = 0; k < 144; k++) {
-    const kk = k % 72;
-    if (schwarzStimmen[kk] >= 2) {
-      if (!aktuell) aktuell = { winkel: [], summe: 0 };
-      aktuell.winkel.push(kk); aktuell.summe += schwarzStimmen[kk];
-    } else if (aktuell) { ketten.push(aktuell); aktuell = null; }
-  }
-  if (aktuell) {
-    // Letzte Kette evtl. mit der ersten verbunden (Wrap): zusammenlegen wenn angrenzend
-    if (ketten.length && aktuell.winkel[0] === 0 && ketten[0].winkel[0] === 1) { ketten[0].winkel.unshift(...aktuell.winkel.reverse()); ketten[0].summe += aktuell.summe; }
-    else ketten.push(aktuell);
-  }
-  let rot = 0;
-  if (ketten.length) {
-    let beste = null;
-    for (const kette of ketten) {
-      if (kette.winkel.length < 2) continue;
-      let sx = 0, sy = 0;
-      for (const w of kette.winkel) { const a = w / 72 * 2 * Math.PI; sx += Math.cos(a); sy += Math.sin(a); }
-      const mitte = Math.atan2(sy, sx) * 180 / Math.PI; // -180..180, 0=oben
-      const abstandOben = Math.min(Math.abs(mitte), 360 - Math.abs(mitte));
-      if (!beste || abstandOben < beste.abstand) beste = { mitte, abstand: abstandOben };
+  let rot = 0, bestScore = -Infinity;
+  for (let cand = -18; cand < 18; cand++) {
+    let score = 0;
+    for (let t = 0; t < 360; t += 2) {
+      const rel = (((t - cand) % 36) + 36) % 36;
+      const ideal = (rel <= 8 || rel >= 28) ? 1 : -1; // schwarzer Sektor UM cand zentriert (±9°)
+      score += signal[t] * ideal;
     }
-    if (beste) rot = beste.mitte;
+    if (score > bestScore) { bestScore = score; rot = cand; }
   }
+  rot = -rot; // Vorzeichen: positive Zahl = Board im Uhrzeigersinn gedreht
+  if (bestScore < 60) rot = 0; // zu schwaches Signal: Kamera als gerade annehmen
   return { cx, cy, r, rot, n, strahlen: rand.length };
 }
 
