@@ -6,30 +6,13 @@
 import { el } from '/js/util.js';
 import { store } from '/js/app.js';
 
-const SEKTORZAHLEN = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
-const RINGE = { bull: 0.037, bull25: 0.094, tripleIn: 0.527, tripleOut: 0.63, doubleIn: 0.92, doubleOut: 1.0 };
+import { segVonPixel as _segVonPixel, findeNeuenPfeil as _finde, setEngineCal } from '/js/core/camera-engine.js';
 
 let stream = null, video = null, canvas = null, ctx = null;
 let cal = null; // {cx, cy, r}
 let baseFrame = null; // ImageData vor dem Wurf
 
-export function segVonPixel(x, y, c) {
-  const dx = x - c.cx, dy = y - c.cy;
-  const r = Math.sqrt(dx * dx + dy * dy) / c.r;
-  if (r > 1.06) return null;
-  if (r <= RINGE.bull) return { k: 'bull', n: 50, v: 50, label: 'BULL' };
-  if (r <= RINGE.bull25) return { k: 'outer', n: 25, v: 25, label: '25' };
-  // Winkel: 20 steht oben, Sektoren gegen den Uhrzeigersinn je 18°
-  let ang = Math.atan2(dx, -dy) * 180 / Math.PI; // 0 = oben, + = rechts
-  if (ang < 0) ang += 360;
-  const idx = Math.round(ang / 18) % 20;
-  const zahl = SEKTORZAHLEN[idx];
-  if (r <= RINGE.tripleIn) return { k: 'single', n: zahl, v: zahl, label: 'S' + zahl };
-  if (r <= RINGE.tripleOut) return { k: 'triple', n: zahl, v: zahl * 3, label: 'T' + zahl };
-  if (r <= RINGE.doubleIn) return { k: 'single', n: zahl, v: zahl, label: 'S' + zahl };
-  if (r <= RINGE.doubleOut) return { k: 'double', n: zahl, v: zahl * 2, label: 'D' + zahl };
-  return null;
-}
+export function segVonPixel(x, y, c) { return _segVonPixel(x, y, c || cal); }
 
 function frameGrab() {
   canvas.width = video.videoWidth; canvas.height = video.videoHeight;
@@ -38,32 +21,7 @@ function frameGrab() {
 }
 
 // Diff: neuen dunklen Punkt finden (Pfeilspitze). Liefert {x, y, staerke} oder null.
-export function findeNeuenPfeil(a, b) {
-  if (!a || !b || a.width !== b.width) return null;
-  const A = a.data, B = b.data;
-  // KAY v2: Schwerpunkt ALLER stark-veraenderten Pixel im Umkreis der Scheibe
-  // (der Flight lockt den alten single-dark-pixel Algorithmus in die Irre)
-  let sumW = 0, sumX = 0, sumY = 0, n = 0, maxD = 0;
-  const step = 2;
-  const c = cal || { cx: a.width / 2, cy: a.height / 2, r: Math.min(a.width, a.height) / 2 };
-  const minX = Math.max(0, c.cx - c.r * 1.25), maxX = Math.min(a.width, c.cx + c.r * 1.25);
-  const minY = Math.max(0, c.cy - c.r * 1.25), maxY = Math.min(a.height, c.cy + c.r * 1.25);
-  for (let y = minY; y < maxY; y += step) {
-    for (let x = minX; x < maxX; x += step) {
-      const i = (Math.round(y) * a.width + Math.round(x)) * 4;
-      const dA = A[i] + A[i + 1] + A[i + 2];
-      const dB = B[i] + B[i + 1] + B[i + 2];
-      const dunkler = dA - dB;
-      if (dunkler > 120) {
-        const w = dunkler * dunkler;
-        sumW += w; sumX += x * w; sumY += y * w; n++;
-        if (dunkler > maxD) maxD = dunkler;
-      }
-    }
-  }
-  if (n < 6 || maxD < 150) return null;
-  return { x: sumX / sumW, y: sumY / sumW, staerke: maxD, pixel: n };
-}
+export function findeNeuenPfeil(a, b) { setEngineCal(cal); return _finde(a, b, cal); }
 
 export async function startCam() {
   if (stream) { // Stream laeuft evtl. schon (alter View) -> NEUES Video anbinden!
