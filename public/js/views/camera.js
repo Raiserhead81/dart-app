@@ -33,6 +33,15 @@ export async function startCam() {
     stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false
     });
+    // KAY: ECHTEN Kamera-Zoom auf MAXIMAL WEIT (Weitwinkel) stellen - breitester
+    // Ausschnitt, die Scheibe mit Umfeld. Der Slider zoomt spaet NUR die Ansicht.
+    try {
+      const track = stream.getVideoTracks()[0];
+      const caps = track.getCapabilities ? track.getCapabilities() : {};
+      if (caps.zoom && caps.zoom.min != null) {
+        await track.applyConstraints({ advanced: [{ zoom: caps.zoom.min }] });
+      }
+    } catch (e) { /* Geraet ohne Zoom-Control: egal */ }
     video.srcObject = stream;
     await video.play();
     return true;
