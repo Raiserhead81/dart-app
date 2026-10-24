@@ -18,6 +18,7 @@ import { activePlayer, store, rerender } from '/js/app.js';
 import { cricketMarksTable } from '/js/views/cricket-ui.js';
 
 const STARTS = [101, 170, 301, 501, 701, 1001];
+const restTickMemo = {}; // letzter Rest je Spieler — fuer den Score-Tick beim Wechsel
 export const PLAYER_COLORS = ['#ff7f2a', '#ff4757', '#2dd4bf', '#a78bfa'];
 
 function buzz(pattern) {
@@ -295,7 +296,7 @@ function paintGame(view, session) {
     const scored = Math.max(0, st.start - rest);
     cards.append(el('div', { class: 'scorecard' + (turn ? ' turn' : ' dim'), style: `--pc:${color}` },
       el('div', { class: 'sc-head' }, el('span', { class: 'sc-name' }, p.name), el('span', { class: 'legboxes' }, ...setChipsUi, ...legBoxes)),
-      el('div', { class: 'sc-rest num' }, String(rest)),
+      el('div', { class: 'sc-rest num' + (restTickMemo[i] !== rest ? ' tick' : '') }, String(rest)),
       el('div', { class: 'sc-progress' }, el('div', { class: 'sc-progress-fill', style: `width:${Math.min(100, scored / st.start * 100)}%` })),
       el('div', { class: 'sc-meta' },
         el('span', { class: 'sc-turn' }, turn ? 'AM ZUG' : ''),
@@ -304,6 +305,7 @@ function paintGame(view, session) {
         el('span', {}, lv != null ? `Last ${lv.points}` : `${darts} Darts`)
       )
     ));
+    restTickMemo[i] = rest;
   });
 
   // Checkout dauerhaft sichtbar

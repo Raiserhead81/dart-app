@@ -148,6 +148,8 @@ label.field { display: block; margin: 10px 0; }
 label.field span { display: block; font-size: 11px; font-weight: 900; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; margin-bottom: 5px; }
 
 /* ---------- SPIELSCREEN (TV) ---------- */
+/* KAY STUFE-2: konsequenter TV-Broadcast — Zahlen wie Live-Übertragung,
+   Gold NUR für Momente (Checkout/180), knackige Motion <150ms. */
 .gtop { display: flex; align-items: center; gap: 8px; min-height: 40px; }
 .glabel { font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); }
 .gbtn {
@@ -168,47 +170,58 @@ label.field span { display: block; font-size: 11px; font-weight: 900; color: var
   --pc: #ff7f2a;
   position: relative; overflow: hidden;
   background: linear-gradient(160deg, rgba(255, 255, 255, .05), transparent 45%), var(--panel2);
-  border: 1px solid var(--line); border-left: 4px solid var(--pc);
-  border-radius: 14px; padding: 10px 14px 12px;
+  border: 1px solid var(--line); border-left: 5px solid var(--pc);
+  border-radius: 14px; padding: 8px 14px 10px;
   min-height: 118px; display: flex; flex-direction: column; justify-content: center;
 }
 .scorecard.turn {
-  background: linear-gradient(160deg, color-mix(in srgb, var(--pc) 22%, transparent), transparent 60%), var(--panel2);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--pc) 26%, transparent), transparent 62%), var(--panel2);
   border-color: var(--pc);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, .5), 0 0 24px color-mix(in srgb, var(--pc) 25%, transparent);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .5), 0 0 0 1px color-mix(in srgb, var(--pc) 45%, transparent), 0 0 34px color-mix(in srgb, var(--pc) 30%, transparent);
   transform: translateY(-2px);
 }
-.scorecard.dim { opacity: .55; }
+.scorecard.dim { opacity: .42; filter: saturate(.6); }
 .sc-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
-.sc-name { font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .12em; color: var(--pc); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-name { font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: .14em; color: var(--pc); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-name::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: currentColor; margin-right: 7px; transform: translateY(-1px); }
 .legboxes { display: flex; gap: 4px; }
-.legbox { width: 10px; height: 10px; border-radius: 3px; border: 1.5px solid var(--line2); }
-.legbox.won { background: var(--pc); border-color: var(--pc); }
+.legbox { width: 11px; height: 11px; border-radius: 3px; border: 1.5px solid var(--line2); }
+.legbox.won { background: var(--pc); border-color: var(--pc); box-shadow: 0 0 8px color-mix(in srgb, var(--pc) 60%, transparent); }
 .sc-rest {
-  font-size: clamp(64px, 17vw, 118px); font-weight: 900; line-height: .92;
-  letter-spacing: -.03em; color: var(--cream); font-variant-numeric: tabular-nums;
+  font-size: clamp(68px, 19vw, 132px); font-weight: 900; line-height: .9;
+  letter-spacing: -.045em; color: #fff; font-variant-numeric: tabular-nums;
+  margin: 2px 0 0 -3px;
+  text-shadow: 0 2px 0 rgba(0,0,0,.35), 0 10px 34px rgba(0, 0, 0, .45);
 }
-.scorecard.turn .sc-rest { color: #fff; text-shadow: 0 0 26px color-mix(in srgb, var(--pc) 45%, transparent); }
+.scorecard.turn .sc-rest { text-shadow: 0 0 30px color-mix(in srgb, var(--pc) 40%, transparent), 0 2px 0 rgba(0,0,0,.35); }
+.scorecard.dim .sc-rest { color: var(--cream); }
+@keyframes restTick { 0% { transform: scale(1.045); } 100% { transform: scale(1); } }
+.sc-rest.tick { animation: restTick 140ms ease-out; }
 .sc-progress { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .08); margin: 8px 0 6px; overflow: hidden; }
-.sc-progress-fill { height: 100%; background: var(--pc); border-radius: 2px; }
+.sc-progress-fill { height: 100%; background: linear-gradient(90deg, var(--pc), color-mix(in srgb, var(--pc) 70%, #fff)); border-radius: 2px; transition: width .3s ease-out; }
 .sc-meta { display: flex; gap: 12px; font-size: 11.5px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
 .sc-turn { color: var(--gold); }
 
+@keyframes coPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(232, 182, 76, 0); } 50% { box-shadow: 0 0 22px 0 rgba(232, 182, 76, .35); } }
 .checkout-banner {
-  min-height: 40px; display: flex; align-items: center; justify-content: center; gap: 12px;
-  background: linear-gradient(90deg, rgba(232, 182, 76, .14), rgba(232, 182, 76, .05));
-  border: 1px solid rgba(232, 182, 76, .45); border-radius: 12px; padding: 8px 14px;
+  min-height: 42px; display: flex; align-items: center; justify-content: center; gap: 12px;
+  background: linear-gradient(90deg, rgba(232, 182, 76, .16), rgba(232, 182, 76, .04));
+  border: 1px solid rgba(232, 182, 76, .55); border-radius: 12px; padding: 8px 14px;
+  animation: coPulse 1.6s ease-in-out infinite;
 }
-.checkout-banner:empty { visibility: hidden; }
+.checkout-banner:empty { visibility: hidden; animation: none; }
 .co-label { font-size: 10px; font-weight: 900; letter-spacing: .16em; color: var(--gold); }
-.co-route { font-size: 21px; font-weight: 900; color: #ffe1a1; letter-spacing: .06em; }
+.co-route { font-size: 22px; font-weight: 900; color: #ffe1a1; letter-spacing: .06em; }
 
 .visitbar { display: flex; gap: 8px; justify-content: center; min-height: 38px; }
+@keyframes dartIn { 0% { transform: scale(.55); opacity: 0; } 70% { transform: scale(1.06); } 100% { transform: scale(1); opacity: 1; } }
 .dartpill {
-  min-width: 62px; text-align: center; background: var(--green-deep); border: 1px solid var(--line2);
-  color: var(--cream); border-radius: 10px; padding: 7px 10px; font-weight: 900; font-size: 16px;
+  min-width: 62px; text-align: center; background: linear-gradient(180deg, color-mix(in srgb, var(--green) 34%, transparent), var(--green-deep)); border: 1px solid var(--line2);
+  color: #fff; border-radius: 10px; padding: 7px 10px; font-weight: 900; font-size: 17px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .08);
+  animation: dartIn 130ms ease-out;
 }
-.dartpill.empty { background: transparent; border-style: dashed; color: var(--muted); }
+.dartpill.empty { background: transparent; border-style: dashed; color: var(--muted); box-shadow: none; animation: none; }
 
 /* ---------- Zahlenpad ---------- */
 .pad { display: flex; flex-direction: column; gap: 8px; margin-top: 2px; }
@@ -223,11 +236,11 @@ label.field span { display: block; font-size: 11px; font-weight: 900; color: var
 .padkey {
   background: linear-gradient(180deg, rgba(255, 255, 255, .05), transparent), var(--panel2);
   border: 1px solid var(--line2); color: var(--text);
-  border-radius: 12px; font-weight: 900; font-size: 22px; min-height: 52px; cursor: pointer;
-  font-variant-numeric: tabular-nums;
+  border-radius: 12px; font-weight: 900; font-size: 24px; min-height: 52px; cursor: pointer;
+  font-variant-numeric: tabular-nums; letter-spacing: -.02em;
   box-shadow: 0 5px 14px rgba(0, 0, 0, .4), inset 0 1px 0 rgba(255, 255, 255, .05);
 }
-.padkey:active { transform: scale(.95); background: var(--green-deep); border-color: var(--green); }
+.padkey:active { transform: scale(.95); background: var(--green); border-color: var(--green-lit); color: #fff; box-shadow: 0 0 22px rgba(70, 196, 122, .45); }
 .padkey.hot { border-color: var(--red); color: #ffc9d2; box-shadow: 0 5px 16px rgba(255, 45, 85, .22); }
 .padkey.bull { color: var(--gold); border-color: rgba(232, 182, 76, .5); }
 .padkey.miss { color: var(--danger); }
