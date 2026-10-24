@@ -213,6 +213,19 @@ function renderX01Game(view) {
   const pad = el('div', { class: 'pad', id: 'pad' });
 
   view.append(top, cards, checkout, visitbar, pad);
+
+  // KAY: KAMERA VOLLAUTO (X01) - PiP oben, erkennt Wuerfe, zaehlt SELBST (3s Korrektur)
+  if (session.useCamera) {
+    const camHost = document.getElementById('camhost') || (() => { const h = el('div', { id: 'camhost', style: 'flex:none;width:100%' }); document.querySelector('.view-game')?.prepend(h); return h; })();
+    mountCam(camHost, (seg) => {
+      const korrektur = el('div', { style: 'position:fixed;left:50%;transform:translateX(-50%);bottom:86px;z-index:60;background:var(--red-deep);border:1px solid var(--red);border-radius:12px;padding:10px 16px;font-weight:900;font-size:14px;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.5)' },
+        el('span', {}, `${seg.label} GEZÄHLT — falsch? `),
+        el('button', { class: 'btn small', onclick: () => { korrektur.remove(); undo(session); toast('Zurückgenommen - bitte manuell tippen'); } }, 'korrigieren'));
+      document.body.append(korrektur);
+      setTimeout(() => korrektur.remove(), 3000);
+      firePad(session, view, () => makeThrow(seg.k === 'outer' ? 'outer' : seg.k, seg.n));
+    });
+  }
   view.append(el('div', { id: 'bigevent' }), el('div', { id: 'boardoverlay' }));
 
   paintGame(view, session);
@@ -631,19 +644,6 @@ function renderCricketGame(view) {
   pad.append(modeRow, grid, special);
   view.append(pad);
 
-  // KAY: KAMERA VOLLAUTO - PiP oben, erkennt Wuerfe, zaehlt SELBST (3s Korrektur)
-  if (session.useCamera) {
-    const camHost = document.getElementById('camhost') || (() => { const h = el('div', { id: 'camhost', style: 'flex:none;width:100%' }); document.querySelector('.view-game')?.prepend(h); return h; })();
-    mountCam(camHost, (seg) => {
-      // Automatischer Wurf - gleiche Pipeline wie das Pad
-      const korrektur = el('div', { style: 'position:fixed;left:50%;transform:translateX(-50%);bottom:86px;z-index:60;background:var(--red-deep);border:1px solid var(--red);border-radius:12px;padding:10px 16px;font-weight:900;font-size:14px;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.5)' },
-        el('span', {}, `${seg.label} GEZÄHLT — falsch? `),
-        el('button', { class: 'btn small', onclick: () => { korrektur.remove(); undo(session); toast('Zurückgenommen - bitte manuell tippen'); } }, 'korrigieren'));
-      document.body.append(korrektur);
-      setTimeout(() => korrektur.remove(), 3000);
-      firePad(session, view, () => makeThrow(seg.k === 'outer' ? 'outer' : seg.k, seg.n));
-    }, (st) => { /* status */ });
-  }
 }
 
 function fireCricket(session, t, view) {
