@@ -20,6 +20,11 @@ describe('Caller-Sequenz (Kays Timing)', () => {
     }
   });
 
+  it('KAY: 1+5+20 = GAAAY AUCH beim Bust (Rest 26, kein Doppel)', () => {
+    const seq = visitSequence({ labels: ['s1', 's5', 's20'], rest: 26, bust: true, points: 0 });
+    expect(seq.map(s => s.clipId)).toEqual(['ph-gay', 'rest-26']);
+  });
+
   it('KAY: Visit unter 10 => Summe + Beleidigung (5 Varianten rotierend)', () => {
     const seq = visitSequence({ labels: ['s3', 's2', 's1'], rest: 444, points: 6 });
     expect(seq.map(s => s.clipId)).toEqual(['sc-6', 'ph-low-1', 'rest-444']);

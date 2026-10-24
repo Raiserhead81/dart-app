@@ -17,12 +17,13 @@ export const GAP_APPLAUSE = 200;
 export function visitSequence(visit, checkoutClipId = null) {
   const { labels = [], rest, bust = false, visit180 = false, points = null } = visit;
   const seq = [];
-  if (bust) {
+  // KAY: 1+5+20 = GAAAY — IMMER, auch beim Bust (hat Vorrang vor No score)
+  if (isGayVisit(labels)) {
+    seq.push({ clipId: 'ph-gay', gapBeforeMs: 0 });
+  } else if (bust) {
     seq.push({ clipId: 'ph-bust', gapBeforeMs: 0 });
   } else if (visit180) {
     seq.push({ clipId: 'ph-180', gapBeforeMs: 0 });
-  } else if (isGayVisit(labels)) {
-    seq.push({ clipId: 'ph-gay', gapBeforeMs: 0 });
   } else {
     if (points != null && points >= 100 && points <= 179) seq.push({ clipId: 'visit-' + points, gapBeforeMs: 0 });
     else if (points != null) seq.push({ clipId: 'sc-' + points, gapBeforeMs: 0 });
