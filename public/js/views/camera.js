@@ -98,8 +98,8 @@ export function mountCam(host, onThrow, onStatus) {
     return;
   }
   host.dataset.camMounted = '1';
-  const v = el('video', { autoplay: '', playsinline: '', muted: '', style: 'width:100%;max-width:150px;border-radius:12px;background:#000;display:block;margin:0 auto' });
-  const note = el('div', { class: 'small muted', style: 'text-align:center;margin-top:4px' }, 'Kamera startet…');
+  const v = el('video', { autoplay: '', playsinline: '', muted: '', style: 'width:110px;height:64px;object-fit:cover;border-radius:10px;background:#000;display:block' });
+  const note = el('div', { class: 'small muted', style: 'text-align:center;margin-top:2px;font-size:9.5px;line-height:1.25' }, 'Kamera startet…');
   host.append(v, note);
   video = v; // Modul-Referenz fuer frameGrab/startAuto
   const phase = { m: 'idle' };
