@@ -23,7 +23,7 @@ function frameGrab() {
 // Diff: neuen dunklen Punkt finden (Pfeilspitze). Liefert {x, y, staerke} oder null.
 export function findeNeuenPfeil(a, b) { setEngineCal(cal); return _finde(a, b, cal); }
 
-export async function startCam() {
+export async function startCam(deviceId) {
   if (stream) { // Stream laeuft evtl. schon (alter View) -> NEUES Video anbinden!
     video.srcObject = stream;
     try { await video.play(); } catch (e) {}
@@ -31,7 +31,7 @@ export async function startCam() {
   }
   try {
     stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false
+      video: deviceId ? { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 } } : { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false
     });
     // KAY: ECHTEN Kamera-Zoom auf MAXIMAL WEIT (Weitwinkel) stellen - breitester
     // Ausschnitt, die Scheibe mit Umfeld. Der Slider zoomt spaet NUR die Ansicht.
@@ -169,6 +169,24 @@ export function renderCamera(view) {
   const phase = { mode: 'idle' }; // idle | kalib-bull | kalib-rand
   const zoom = el('input', { type: 'range', min: 100, max: 300, value: 100, style: 'width:100%;display:none' });
   const startBtn = el('button', { class: 'btn primary wide mt' }, 'Kamera starten');
+  // KAY/OPPO Find X: mehrere Linsen - Auswahl der Back-Kameras (Weitwinkel!)
+  const lensRow = el('div', { class: 'row mt', style: 'gap:6px' });
+  (async () => {
+    try {
+      const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+      devs.forEach((d, i) => {
+        lensRow.append(el('button', {
+          class: 'chip', onclick: async (e) => {
+            [...lensRow.children].forEach(c => c.classList.remove('on'));
+            e.currentTarget.classList.add('on');
+            stopCam();
+            const ok = await startCam(d.deviceId);
+            status.textContent = ok ? 'Linse ' + (i + 1) + ' aktiv - kalibriere neu!' : 'Linse ' + (i + 1) + ' ging nicht';
+          }
+        }, 'Linse ' + (i + 1)));
+      });
+    } catch (e) { /* keine Auflistung */ }
+  })();
 
   startBtn.onclick = async () => {
     status.textContent = 'starte Kamera…';
@@ -239,8 +257,7 @@ export function renderCamera(view) {
   view.append(
     el('p', { class: 'kicker' }, 'Kamera-Assistent'),
     el('div', { class: 'panel' },
-      el('h2', {}, 'Scheibe filmen', el('span', { class: 'sub' }, 'Handy ~1m davor, Zoom fuer den Blick')),
-      host, zoom, status, startBtn, refBtn, erkenne,
+      el('h2', {}, 'Scheibe filmen', el('span', { class: 'sub' }, 'Handy ~1m davor')), lensRow, host, zoom, status, startBtn, refBtn, erkenne,
       el('p', { class: 'small muted mt' }, 'Test-Modus: kalibrieren, Referenz, werfen, erkennen. Auto-Zaehlung im Spiel folgt als nächster Schritt.')
     )
   );
