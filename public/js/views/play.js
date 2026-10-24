@@ -216,6 +216,18 @@ function renderX01Game(view) {
 
   // KAY: KAMERA VOLLAUTO (X01) - PiP oben, erkennt Wuerfe, zaehlt SELBST (3s Korrektur)
   if (session.useCamera) {
+    // Mit Kamera brauchst du das Zahlenpad nicht: einklappen, MISS + Pad-Toggle bleiben
+    pad.style.display = 'none';
+    const padToggleTxt = el('span', {}, 'Zahlenpad');
+    const manualRow = el('div', { class: 'row', style: 'gap:8px' },
+      el('button', { class: 'padkey miss', style: 'flex:1;min-height:44px', onclick: () => firePad(session, view, () => makeThrow('miss', 0)) }, 'MISS'),
+      el('button', { class: 'gbtn', style: 'flex:2;min-height:44px', onclick: () => {
+        const offen = pad.style.display !== 'none';
+        pad.style.display = offen ? 'none' : '';
+        padToggleTxt.textContent = offen ? 'Zahlenpad' : 'Pad ausblenden';
+        fitGameScreen ? null : null;
+      } }, padToggleTxt));
+    view.insertBefore(manualRow, pad);
     const camHost = document.getElementById('camhost') || (() => { const h = el('div', { id: 'camhost', style: 'flex:none;width:100%' }); document.querySelector('.view-game')?.prepend(h); return h; })();
     mountCam(camHost, (seg) => {
       const korrektur = el('div', { style: 'position:fixed;left:50%;transform:translateX(-50%);bottom:86px;z-index:60;background:var(--red-deep);border:1px solid var(--red);border-radius:12px;padding:10px 16px;font-weight:900;font-size:14px;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.5)' },
