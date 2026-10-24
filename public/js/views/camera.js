@@ -323,8 +323,9 @@ export function renderCamera(view) {
     if (await startCam()) {
       video.style.display = '';
       zoom.style.display = '';
-      status.textContent = 'Kalibrierung: Tippe auf das BULL-Zentrum';
-      phase.mode = 'kalib-bull';
+      status.textContent = '① SCHEIBE KALIBRIEREN drücken (unten)';
+      kalibBtn.style.display = '';
+      phase.mode = 'idle'; // Auto-Kalibrierung ersetzt die Tipp-Kalibrierung
       startBtn.style.display = 'none';
       recBtn.style.display = '';
     } else {
@@ -366,6 +367,22 @@ export function renderCamera(view) {
   }
 
   const refBtn = el('button', { class: 'btn wide mt', style: 'display:none' }, 'Referenzbild aufnehmen');
+
+  // ECHTE AUTO-KALIBRIERUNG in den Kamera-EINSTELLUNGEN: ein Druck + Raster-Beweis
+  const kalibErgebnis = el('div', { class: 'small muted mt' }, '');
+  const kalibBtn = el('button', { class: 'btn primary wide mt', style: 'display:none' }, '① SCHEIBE KALIBRIEREN');
+  kalibBtn.onclick = async () => {
+    kalibBtn.textContent = 'Kalibriere… (Scheibe frei sichtbar)';
+    kalibBtn.disabled = true;
+    const erg = await autoKalibriere(video);
+    kalibBtn.disabled = false;
+    if (!erg) { kalibBtn.textContent = 'Nicht gefunden - Licht/Position prüfen, nochmal'; kalibErgebnis.textContent = ''; return; }
+    cal = erg; saveCal();
+    kalibBtn.textContent = '✓ Kalibriert - nochmal?';
+    kalibErgebnis.textContent = 'Zentrum ' + Math.round(erg.cx) + '/' + Math.round(erg.cy) + ' · Radius ' + Math.round(erg.r) + 'px — gespeichert, das Spiel nutzt sie ab sofort.';
+    // Raster als Beweis uebers Live-Bild
+    zeichneRaster(video, erg);
+  };
   refBtn.style.display = '';
   refBtn.onclick = () => { baseFrame = frameGrab(); status.textContent = 'Referenz steht - Dart werfen!'; };
 
@@ -417,4 +434,28 @@ export function autoKalibriere(videoEl) {
     const skal = videoEl.videoWidth / 270;
     resolve({ cx: med(ergs, 'cx') * skal, cy: med(ergs, 'cy') * skal, r: med(ergs, 'r') * skal });
   });
+}
+
+
+function zeichneRaster(videoEl, calErg) {
+  let c = document.getElementById('camoverlay');
+  if (!c) { c = el('canvas', { id: 'camoverlay', style: 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:4' }); videoEl.parentElement.append(c); }
+  const box = videoEl.getBoundingClientRect();
+  c.width = box.width; c.height = box.height;
+  const ctx = c.getContext('2d');
+  const ow = videoEl.offsetWidth, oh = videoEl.offsetHeight;
+  const zoom = videoEl.style.transform ? (parseFloat(videoEl.style.transform.replace(/[^\d.]/g, '')) || 1) : 1;
+  const sc = Math.min(ow / videoEl.videoWidth, oh / videoEl.videoHeight) * zoom;
+  const vx = (box.width - videoEl.videoWidth * sc) / 2, vy = (box.height - videoEl.videoHeight * sc) / 2;
+  ctx.clearRect(0, 0, c.width, c.height);
+  ctx.strokeStyle = 'rgba(70,196,122,.95)'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.arc(vx + calErg.cx * sc, vy + calErg.cy * sc, calErg.r * sc, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = 'rgba(70,196,122,.5)';
+  for (let i = 0; i < 20; i++) {
+    const a = (i * 18 - 9) * Math.PI / 180;
+    ctx.beginPath();
+    ctx.moveTo(vx + calErg.cx * sc, vy + calErg.cy * sc);
+    ctx.lineTo(vx + (calErg.cx + Math.sin(a) * calErg.r) * sc, vy + (calErg.cy - Math.cos(a) * calErg.r) * sc);
+    ctx.stroke();
+  }
 }

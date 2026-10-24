@@ -655,25 +655,9 @@ function baueKameraBereich(session, view) {
   if (h.dataset.komplett !== '1') {
     h.dataset.komplett = '1';
     const camHinweis = el('div', { style: 'position:absolute;bottom:64px;left:50%;transform:translateX(-50%);background:rgba(7,11,9,.92);border:1px solid var(--green);padding:10px 22px;border-radius:12px;font-size:16px;font-weight:900;color:#fff;z-index:5;letter-spacing:.04em;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.6);animation:camPulse 1.2s ease-in-out infinite' }, '👆 TIPP JETZT auf deinen Treffer');
-    const kalibBtn = el('button', { class: 'btn primary', style: 'position:absolute;bottom:10px;left:50%;transform:translateX(-50%);z-index:5;min-height:40px;padding:8px 18px' }, '① SCHEIBE KALIBRIEREN');
-    kalibBtn.onclick = async () => {
-      kalibBtn.textContent = 'Kalibriere… (Scheibe frei lassen)';
-      kalibBtn.disabled = true;
-      const v = document.querySelector('#camhost video');
-      const { autoKalibriere } = await import('/js/views/camera.js');
-      const erg = v ? await autoKalibriere(v) : null;
-      kalibBtn.disabled = false;
-      if (erg) {
-        setCal(erg); saveCal();
-        kalibBtn.textContent = '✓ Kalibriert (R=' + Math.round(erg.r) + 'px) - nochmal';
-        camHinweis.textContent = 'KALIBRIERT ✓ - wirf und tippe deine Treffer';
-        zeichneBoardOverlay(v, erg);
-        setTimeout(() => { kalibBtn.textContent = 'Scheibe neu kalibrieren'; }, 2500);
-      } else {
-        kalibBtn.textContent = 'Nicht gefunden - nochmal (Licht prüfen)';
-      }
-    };
-    h.append(camHinweis, kalibBtn);
+    const hatKalib = !!store.state.settings.cameraCal;
+    camHinweis.textContent = hatKalib ? '👆 TIPP JETZT auf deinen Treffer' : '⚠ Erst kalibrieren: Profil → Kamera-Assistent';
+    h.append(camHinweis);
     setTimeout(() => {
       const v = document.querySelector('#camhost video');
       if (v) {
