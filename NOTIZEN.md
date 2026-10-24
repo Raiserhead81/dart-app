@@ -47,3 +47,14 @@
   Kay-Zitat Ablauf: er sagt "jetzt", Frame ziehen. Display muss AN sein (sonst schwarz).
 - Kays Regeln heute gelernt: ERST selbst messen/beweisen dann Kay (Screenshot-Routine mit
   wake+PIL-check), keine Toggle-Verwirrung, Beenden ohne Rueckfrage, Kabel nur zum Uebertragen
+
+## Tap-Eingabe Stand (24.10. spät)
+- TAP-AUF-DIE-SCHEIBE funktioniert (zaehlt), Felder "teilweise" richtig
+- Zoom-sichere Kalibrierung + Bull-Feintuning (Kontroll-Tipp) sind DEPLOYED - Kay
+  hat evtl. noch nicht mit der neuesten Version neu kalibriert!
+- Kay's 2 Referenzfotos: camera-ref/kay-scheibe1+2.jpg (Oppo-Fotokamera 4416x5888,
+  Pfeile auf S20/D11/S19 etc. per glm erkannt) - fuer naechste Kalibrier-Session
+- NAECHSTE SESSION: 1. App-Frame via CDP ziehen (Display AN, App VORDERGRUND!)
+  2. glm vermisst Scheibe im STREAM-Raum (nicht Foto-Raum!) 3. cameraCal direkt
+  setzen (ohne Kay-Tipps) 4. Kay testet Taps. Alternativ Kay kalibriert neu mit
+  der neuen Feintuning-Version (Bull-Kontrolltipp).
