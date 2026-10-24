@@ -168,9 +168,13 @@ export function renderStats(view, arg) {
         el('span', { class: 'wv' }, zeigeWert ? String(Math.round(v)) : ''),
         el('span', { class: 'wl' }, i % 2 === 0 || i === trend.length - 1 ? t.label.replace(/[^0-9]/g, '').slice(-2) : ''));
     }));
+  const curWeek = withData[withData.length - 1];
   view.append(el('div', { class: 'darkpanel' },
-    el('h2', {}, 'Verlauf', el('span', { class: 'sub' }, withData.length < 2 ? 'ab Woche 2 waechst dein Verlauf' : '3-Dart-Ø je Kalenderwoche')),
-    bars,
+    el('h2', {}, 'Verlauf', el('span', { class: 'sub' }, withData.length < 2 ? 'deine Woche auf einen Blick' : '3-Dart-Ø je Kalenderwoche')),
+    withData.length < 2 ? el('div', { class: 'weekhero' },
+      el('div', { class: 'wh-num' }, String(Math.round(curWeek ? curWeek.stats.avg3 : 0)).replace('.', ',')),
+      el('div', { class: 'wh-sub' }, `${curWeek ? curWeek.label : ''} · Ø 3-Dart`),
+      el('div', { class: 'wh-note' }, 'Nächste Woche wächst hier dein erster Verlaufs-Balken')) : bars,
     el('div', { class: 'legend' },
       el('span', {}, el('i', { class: 'sw', style: 'background:linear-gradient(180deg,#ffd479,#d9a441)' }), 'Beste Woche'),
       el('span', {}, el('i', { class: 'sw', style: 'background:rgba(255,107,87,.9)' }), 'Aktuell')),
