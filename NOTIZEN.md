@@ -15,3 +15,17 @@
 - KEIN SCROLLEN (24.10.): fitGameScreen() in app.js skaliert .view-game per transform:scale auf den Viewport (Hoehe mitschrumpfen!). padBottom nur auf Mobile abziehen (Rail), Desktop zahlt voll. Regressionstest scripts/e2e-fit.mjs (390x700/820x1180/1280x800 => noScroll).
 - Server-Clips liegen in /var/www/dart-app-caller (nginx alias /caller/, ausserhalb des deploy-rsync).
 - Online-Match: callVisitEnd bekommt jetzt den echten Rest NACH dem Visit (vorher Bug: Rest vor dem Visit) + echte Visit-Summe via visitStartRest-Tracking.
+
+## Kamera-Assistent (Branch feature/kamera-assist, Stand 24.10. abends)
+- Vollauto: Setup-Toggle + Kamera-Button im laufenden Spiel (Toggle, 'Kamera: AN/AUS')
+- PiP: eigene Zeile ueber dem gtop, volle Breite, 26vh, object-fit CONTAIN
+- WICHTIG: Tap-Kalibrierung rechnet contain-letterbox zurueck (camera.js mountCam)
+- Engine v2 in src/camera-engine.js (pure): Schwerpunkt-Diff im Board-Crop, 6 Unit-Tests gruen
+- APK: CAMERA-Permission + Runtime-Grant + onPermissionRequest(grant) + onBackPressed(goBack)
+- beforeunload-Dialog nur noch im Browser (nicht APK-WebView, UA '; wv)')
+- OFFEN (naechste Session!): App-WebView laedt nach Deploys teils ALTE Module (Klick-Handler
+  verhielt sich nach 15:12-Deploy noch alt trotz no-cache+clearCache) -> Ursache finden:
+  vermutlich SW-Modul-Cache in der WebView; ggf. App-Start mit ?v=Cache-Bust laden
+- OFFEN: echte Erkennungs-Quote an Kays Scheibe messen (10 Darts), Schwellwerte tunen
+- Kay-Regeln: ERST selbst via WebView-CDP testen (volltest-Muster), Screenshots nur bei
+  wachem Display (wake+Pixelcheck), keine Toggle-Zombie-Zustaende raten
