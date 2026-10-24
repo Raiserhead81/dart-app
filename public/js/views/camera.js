@@ -10,6 +10,24 @@ import { segVonPixel as _segVonPixel, findeNeuenPfeil as _finde, setEngineCal } 
 
 let stream = null, video = null, canvas = null, ctx = null;
 let recorder = null, recChunks = [], recOnStop = null;
+
+// KAY: Aufnahmen PERSISTENT in IndexedDB (ueberlebt App-Neustart, kein Kabel noetig)
+function idbSpeichereAufnahme(blob, ts) {
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open('dartpro-cam', 1);
+      req.onupgradeneeded = () => { req.result.createObjectStore('recs'); };
+      req.onsuccess = () => {
+        const db = req.result;
+        const tx = db.transaction('recs', 'readwrite');
+        tx.objectStore('recs').put({ blob, ts, size: blob.size }, 'letzte');
+        tx.oncomplete = () => { window.__recPersist = 'ok ' + ts; resolve('ok'); };
+        tx.onerror = () => resolve('tx-fehler');
+      };
+      req.onerror = () => resolve('db-fehler');
+    } catch (e) { resolve('exception'); }
+  });
+}
 export function aufnahmeLaeuft() { return recorder && recorder.state === 'recording'; }
 export function toggleAufnahme(fertig) {
   return new Promise((resolve) => {
@@ -24,6 +42,7 @@ export function toggleAufnahme(fertig) {
     recorder.onstop = () => {
       const blob = new Blob(recChunks, { type: 'video/webm' });
       window.__lastRecording = blob;
+      idbSpeichereAufnahme(blob, Date.now()); // PERSISTENT: ueberlebt Neustart
       if (fertig) fertig(blob.size);
       resolve('gestartet-und-gestoppt ' + blob.size);
     };
