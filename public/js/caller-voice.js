@@ -264,9 +264,9 @@ async function drain() {
     const item = queue.shift();
     if (!item) continue;
     if (item.gapBeforeMs) { trace('gap', { ms: item.gapBeforeMs }); await sleep(item.gapBeforeMs); }
-    if (settings.voiceSet === DEVICE_SET || item.tts) {
-      trace('tts', { text: item.text, fun: !!item.tts });
-      await speakFallback(item.text); // explizites Gerätstimme-Set bzw. KAY-FUN-Phrasen
+    if (settings.voiceSet === DEVICE_SET) {
+      trace('tts', { text: item.text });
+      await speakFallback(item.text); // explizites Gerätstimme-Set
       continue;
     }
     // Clip-Fallback-AUS: fehlt der Clip -> Stille. Kein speechSynthesis-Auto-Mix.
