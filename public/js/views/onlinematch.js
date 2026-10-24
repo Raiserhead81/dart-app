@@ -52,7 +52,8 @@ export function renderOnlineMatch(view, matchId) {
       if (res.event?.type === 'bust') callBust();
       if (res.event?.type === 'turn' || res.event?.type === 'bust') {
         const restAfter = res.state?.leg?.remaining?.[throwerIdx];
-        const points = (Number.isFinite(visitStartRest) && Number.isFinite(restAfter)) ? Math.max(0, visitStartRest - restAfter) : null;
+        const vStart = res.state?.leg?.visitStart ?? visitStartRest; // Rest vor dem Visit
+        const points = (Number.isFinite(vStart) && Number.isFinite(restAfter)) ? Math.max(0, vStart - restAfter) : null;
         callVisitEnd(Number.isFinite(restAfter) ? restAfter : restBefore, {
           forMatch, bust: res.event?.type === 'bust', labels: visitLabels, points
         });

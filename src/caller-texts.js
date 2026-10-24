@@ -74,7 +74,8 @@ export function buildCallerSentences() {
   out['en/ph-gameshot'] = 'Game shot!';
   out['en/ph-bust'] = 'No score!';
 
-  // KAY-FUN: 1+5+20 = "GAAAY!!" (statt Summe 26) + Trash-Talk bei Visit < 10
+  // KAY-FUN (final, 24.10.): 1+5+20 = "GAAAY!!" + Trash-Talk bei Visit < 10
+  // (Claudio... nein: Gemini-Stimme Charon, strikte Prompts, von Kay abgehört+abgesegnet)
   out['en/ph-gay'] = 'GAAAY!!';
   out['de/ph-gay'] = 'GAAAY!!';
   out['en/ph-low-1'] = 'You call that darts?! Appalling!';

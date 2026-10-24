@@ -349,7 +349,7 @@ function doThrow(session, t, { rerenderView } = {}) {
 
   const restAfter = st.leg.remaining[p];
   const visitDartsNow = st.leg.visit.length;
-  const visitPoints = ev.type === 'bust' ? 0 : restBefore - restAfter;
+  const visitPoints = ev.type === 'bust' ? 0 : (legVisitStartBefore != null ? legVisitStartBefore - restAfter : restBefore - restAfter);
   const segLabel = t.k === 'bull' ? 'bull' : t.k === 'outer' ? '25' : (t.k[0] + t.n);
   session.visitLabels = session.visitLabels || [];
   session.visitLabels.push(segLabel);
