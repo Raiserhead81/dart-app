@@ -67,10 +67,16 @@ export function findeNeuenPfeil(a, b, calOverride) {
 
 // ---------- Auto-Kalibrierung (pure, testbar) ----------
 export function normalisiereFrame(D) {
-  // Kontraststreckung je Kanal (Nachtsicht): dunkle Streams bekommen Farbe zurueck
-  let maxR = 1, maxG = 1, maxB = 1;
-  for (let i = 0; i < D.length; i += 16) { if (D[i] > maxR) maxR = D[i]; if (D[i + 1] > maxG) maxG = D[i + 1]; if (D[i + 2] > maxB) maxB = D[i + 2]; }
-  return { maxR, maxG, maxB };
+  // NACHTSICHT KORREKT: EIN globaler Faktor (255/maxHelligkeit). Kanalweise
+  // Verstaerkung wuerde Hue/Saettigung verzerren und Rauschen zu "Farben" machen
+  // (die Ursache fuer Kays Fehlmessungen). Ein Skalierungsfaktor laesst
+  // Farbmassstab unberuehrt - dunkle Boards werden nur "heller gerechnet".
+  let maxVal = 1;
+  for (let i = 0; i < D.length; i += 16) {
+    const v = Math.max(D[i], D[i + 1], D[i + 2]);
+    if (v > maxVal) maxVal = v;
+  }
+  return { scale: 255 / maxVal, maxR: maxVal, maxG: maxVal, maxB: maxVal };
 }
 
 export function analyseBoardInFrame(img) {
@@ -91,8 +97,8 @@ export function analyseBoardInFrame(img) {
     return [h, s, mx];
   };
   const { maxR, maxG, maxB } = normalisiereFrame(D);
-  const istRotPx = (r, g, b) => { const [h, sv, vv] = rgb2hsv(r * 255 / maxR, g * 255 / maxG, b * 255 / maxB); return (h < 25 || h > 335) && sv > 0.32 && vv > 0.18; };
-  const istGruenPx = (r, g, b) => { const [h, sv, vv] = rgb2hsv(r * 255 / maxR, g * 255 / maxG, b * 255 / maxB); return h > 80 && h < 165 && sv > 0.25 && vv > 0.15; };
+  const istRotPx = (r, g, b) => { const [h, sv, vv] = rgb2hsv(r * 255 / maxR, g * 255 / maxG, b * 255 / maxB); return (h < 25 || h > 335) && sv > 0.30 && vv > 0.15; };
+  const istGruenPx = (r, g, b) => { const [h, sv, vv] = rgb2hsv(r * 255 / maxR, g * 255 / maxG, b * 255 / maxB); return h > 80 && h < 165 && sv > 0.22 && vv > 0.12; };
   const punkte = [];
   let sx = 0, sy = 0, n = 0;
   for (let y = 2; y < H - 2; y += 1) {
