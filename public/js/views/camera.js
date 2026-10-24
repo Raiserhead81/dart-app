@@ -172,7 +172,7 @@ export function renderCamera(view) {
   const lensRow = el('div', { class: 'row mt', style: 'gap:6px' });
   (async () => {
     try {
-      const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+      const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput' && !/front/i.test(d.label || ''));
       devs.forEach((d, i) => {
         lensRow.append(el('button', {
           class: 'chip', onclick: async (e) => {
@@ -183,7 +183,7 @@ export function renderCamera(view) {
             const ok = await startCam(d.deviceId);
             status.textContent = ok ? 'Linse ' + (i + 1) + ' gespeichert - Spiel nutzt sie jetzt!' : 'Linse ' + (i + 1) + ' ging nicht';
           }
-        }, 'Linse ' + (i + 1)));
+        }, 'Linse ' + (i + 1) + (d.label ? ' (' + d.label.replace(/camera ?/i, 'Cam ') + ')' : '')));
       });
     } catch (e) { /* keine Auflistung */ }
   })();
