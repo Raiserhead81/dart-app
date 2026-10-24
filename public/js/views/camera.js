@@ -113,16 +113,14 @@ export function mountCam(host, onThrow, onStatus) {
   const frame = el('div', { style: 'width:100%;height:min(75vh, 620px);overflow:hidden;border-radius:14px;background:#000;position:relative' });
   const v = el('video', { autoplay: '', playsinline: '', muted: '', style: 'width:100%;height:100%;object-fit:contain;display:block;transform-origin:center' });
   // KAY: Start MAXIMAL weit draussen (0,4x), dann gezielt reinziehen
-  const zoomLabel = el('span', { class: 'small muted', style: 'float:right' }, '1,0x');
-  const zoom = el('input', { type: 'range', min: 60, max: 500, value: 100, step: 5, style: 'width:100%;margin:6px 0 0' });
+  const zoomLabel = el('span', { class: 'small muted', style: 'float:right' }, '0,5x');
+  const zoom = el('input', { type: 'range', min: 30, max: 500, value: 50, step: 5, style: 'width:100%;margin:6px 0 0' });
   
   zoom.oninput = () => { v.style.transform = `scale(${zoom.value / 100})`; zoomLabel.textContent = (zoom.value / 100).toFixed(1).replace('.', ',') + 'x'; };
   const note = el('div', { class: 'small muted', style: 'text-align:center;margin-top:2px;font-size:10.5px;line-height:1.25' }, 'Kamera startet…');
   frame.append(v);
-  // Ohne echten Weitwinkel (Geraet ignoriert Zoom-Constraint): Ansicht weiter draussen starten
-  if (stream && stream._weitwinkelOk === false) {
-    zoom.value = 70; zoomLabel.textContent = '0,7x'; v.style.transform = 'scale(0.7)';
-  }
+  // KAY: Ansicht startet IMMER weit draussen (0,5x) - dann gezielt reinzoomen
+  zoom.value = 50; zoomLabel.textContent = '0,5x'; v.style.transform = 'scale(0.5)';
   const zoomRow = el('div', {}, zoomLabel);
   host.append(frame, zoomRow, zoom, note);
   video = v; // Modul-Referenz fuer frameGrab/startAuto
