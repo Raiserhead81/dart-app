@@ -473,3 +473,17 @@ button.listitem strong { color: var(--cream); }
 .darkpanel h2, .recordsec .kick { text-transform: uppercase; letter-spacing: .12em; }
 /* Zahlen ueberall tabellarisch */
 .kpi .value, .hero-num, .heromini .v, .reckpi .v, .bench-value { font-variant-numeric: tabular-nums; }
+
+/* ===== 12-Wochen-Broadcast-Balken (KAY 24.10.) ===== */
+.hero-num { font-size: clamp(38px, 13vw, 58px); }
+.herorow { gap: 10px; }
+.hero-kpi { padding: 14px 8px 12px; }
+.weekbars { display: flex; align-items: flex-end; gap: 4px; height: 150px; margin: 16px 0 22px; padding-top: 18px; }
+.weekbar { flex: 1; background: linear-gradient(180deg, rgba(255, 107, 87, .85), rgba(192, 57, 43, .3)); border-radius: 4px 4px 0 0; min-height: 3px; position: relative; opacity: .38; }
+.weekbar.now { opacity: 1; box-shadow: 0 0 18px rgba(255, 107, 87, .45); }
+.weekbar.best { opacity: 1; background: linear-gradient(180deg, #ffd479, #b3812f); box-shadow: 0 0 20px rgba(217, 164, 65, .5); }
+.weekbar .wl { position: absolute; bottom: -17px; left: 50%; transform: translateX(-50%); font-size: 9px; color: #8fa0b5; font-weight: 800; }
+.weekbar .wv { position: absolute; top: -17px; left: 50%; transform: translateX(-50%); font-size: 10.5px; font-weight: 900; color: #fff; opacity: 0; font-variant-numeric: tabular-nums; }
+.weekbar.now .wv, .weekbar.best .wv { opacity: 1; }
+.weekbar.now .wv { color: #ff8d7a; }
+.weekbar.best .wv { color: #ffd479; }

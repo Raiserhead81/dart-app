@@ -146,20 +146,25 @@ export function renderStats(view, arg) {
     )
   ));
 
-  // ===== Verlauf: fetter Wochen-Chart + Wochenvergleich mit ±-Badges =====
-  const chart = lineChart([
-    { label: '3-Dart-Avg', values: trend.map(t => t.stats.avg3), labels: trend.map(t => t.label), color: '#ff6b57' },
-    { label: 'Doppel %', values: trend.map(t => t.stats.doubles.pct), labels: trend.map(t => t.label), color: '#e8dfc8' },
-    { label: 'Checkout %', values: trend.map(t => t.stats.checkout.pct), labels: trend.map(t => t.label), color: '#ffd479' }
-  ], { yMin: 0, yMax: 100 });
+  // ===== Verlauf: 12-Wochen-Broadcast-Balken (KAY: Linienchart raus — klare Balken,
+  // beste Woche GOLD, aktuelle Woche LEUCHTET, Werte auf den wichtigen) =====
+  const avgs = trend.map(t => t.stats.avg3 || 0);
+  const maxA = Math.max(10, ...avgs);
+  const bestIdx = avgs.indexOf(Math.max(...avgs));
+  const bars = el('div', { class: 'weekbars' },
+    ...trend.map((t, i) => {
+      const v = t.stats.avg3 || 0;
+      const h = Math.max(3, Math.round(v / maxA * 100));
+      return el('div', { class: 'weekbar' + (i === trend.length - 1 && v > 0 ? ' now' : '') + (i === bestIdx && v > 0 ? ' best' : ''), style: `height:${h}%`, title: `${t.label}: Ø ${String(Math.round(v)).replace('.', ',')}` },
+        el('span', { class: 'wv' }, v > 0 ? String(Math.round(v)) : ''),
+        el('span', { class: 'wl' }, t.label.replace(/[^0-9]/g, '').slice(-2)));
+    }));
   view.append(el('div', { class: 'darkpanel' },
-    el('h2', {}, 'Verlauf · 12 Wochen', el('span', { class: 'sub' }, 'ISO-Wochen, Montag-Start')),
-    chart,
+    el('h2', {}, 'Verlauf · 12 Wochen', el('span', { class: 'sub' }, '3-Dart-Ø je Kalenderwoche')),
+    bars,
     el('div', { class: 'legend' },
-      el('span', {}, el('i', { class: 'sw', style: 'background:#ff6b57' }), '3-Dart-Avg'),
-      el('span', {}, el('i', { class: 'sw', style: 'background:#e8dfc8' }), 'Doppel %'),
-      el('span', {}, el('i', { class: 'sw', style: 'background:#ffd479' }), 'Checkout %')
-    ),
+      el('span', {}, el('i', { class: 'sw', style: 'background:linear-gradient(180deg,#ffd479,#d9a441)' }), 'Beste Woche'),
+      el('span', {}, el('i', { class: 'sw', style: 'background:rgba(255,107,87,.9)' }), 'Aktuell')),
     el('div', { class: 'weekgrid mt' },
       ...trend.slice().reverse().filter(t => t.stats.darts > 0).map(t => el('div', { class: 'weekrow' },
         el('div', { class: 'wk' }, t.label),
