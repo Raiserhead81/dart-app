@@ -100,9 +100,12 @@ if (bootCss) bootCss.remove();
 window.addEventListener('hashchange', rerender);
 
 // Speichern bei Verlassen warnen, solange ein Spiel laeuft (verhindert versehentliches Swipe-Close)
-window.addEventListener('beforeunload', (e) => {
-  if (window.__DARTPRO_SESSION_ACTIVE) { e.preventDefault(); e.returnValue = ''; }
-});
+const IST_WEBVIEW_APP = /; wv\)/.test(navigator.userAgent);
+if (!IST_WEBVIEW_APP) {
+  window.addEventListener('beforeunload', (e) => {
+    if (window.__DARTPRO_SESSION_ACTIVE) { e.preventDefault(); e.returnValue = ''; }
+  });
+}
 
 configureCaller(store.state.settings?.caller || {});
 // Stim-Migration: unvollstaendiges Set im Storage -> einmalig auf elevenlabs-brian
