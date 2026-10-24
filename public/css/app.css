@@ -87,6 +87,16 @@ button { font: inherit; }
 /* KAY: Beim Auto-Scale (fitGameScreen) darf flex KEIN Kind stauchen — sonst
    ueberlappen Pills/Pad-Buttons (dartpill x padmode-Overlap). */
 .view-game > *, .pad > *, .scorecards > *, .gtop, .visitbar, .checkout-banner { flex-shrink: 0; }
+
+/* KAY: Start-/Setup-Seite kompakt — der 'Spiel starten'-Button muss ohne Scrollen
+   erreichbar sein (Kay-Feedback: 'kein button da'). */
+@media (max-width: 939px) {
+  .view { padding-top: 8px; }
+  .panel { padding: 12px 12px 10px; margin-bottom: 10px; }
+  .chip { min-height: 38px; padding: 6px 12px; }
+  .btn { min-height: 46px; padding: 11px 14px; }
+  label.field { margin: 8px 0; }
+}
 @media (max-width: 939px) {
   .view-game { min-height: calc(100dvh - var(--nav-h)); padding-bottom: calc(var(--nav-h) + 10px); overflow: hidden; }
 }

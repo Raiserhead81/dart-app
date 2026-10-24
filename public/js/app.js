@@ -78,7 +78,9 @@ function fitGameScreen() {
     g.style.transformOrigin = 'top center';
     g.style.transform = `scale(${Math.max(0.4, Math.round(f * 1000) / 1000)})`;
     g.style.minHeight = '0';
-    g.style.height = Math.round(need * f) + 'px'; // Layout-Hoehe mitschrumpfen — sonst bleibt die Seite scrollbar
+    // KAY-FIX: Hoehe beschneiden clippt die letzte Reihe (BULL) trotz Scale —
+    // negativer Margin verkuerzt das Layout OHNE Clip: alles sichtbar, kein Scroll.
+    g.style.marginBottom = `-${Math.round(need * (1 - f))}px`;
   }
 }
 window.addEventListener('resize', fitGameScreen);
