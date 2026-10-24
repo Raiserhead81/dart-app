@@ -76,7 +76,7 @@ function fitGameScreen() {
   const f = Math.min(1, avail / need, (window.innerWidth - 8) / Math.max(1, g.scrollWidth));
   if (f < 0.99) {
     g.style.transformOrigin = 'top center';
-    g.style.transform = `scale(${Math.max(0.5, Math.round(f * 1000) / 1000)})`;
+    g.style.transform = `scale(${Math.max(0.4, Math.round(f * 1000) / 1000)})`;
     g.style.minHeight = '0';
     g.style.height = Math.round(need * f) + 'px'; // Layout-Hoehe mitschrumpfen — sonst bleibt die Seite scrollbar
   }

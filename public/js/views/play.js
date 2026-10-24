@@ -228,7 +228,14 @@ function buildPad(view, session) {
   for (let n = 20; n >= 1; n--) {
     grid.append(el('button', {
       class: 'padkey num',
-      onclick: () => firePad(session, view, () => padThrow(session.padMode, n))
+      onclick: () => {
+        firePad(session, view, () => padThrow(session.padMode, n));
+        // KAY: DOUBLE/TRIPLE gelten nur fuer DEN EINEN Wurf — danach automatisch zurueck auf SINGLE
+        if (session.padMode !== 'single') {
+          session.padMode = 'single';
+          modeBtns.forEach(b => b.classList.toggle('on', b.textContent === 'SINGLE'));
+        }
+      }
     }, String(n)));
   }
 

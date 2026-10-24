@@ -87,6 +87,14 @@ button { font: inherit; }
 @media (max-width: 939px) {
   .view-game { min-height: calc(100dvh - var(--nav-h)); padding-bottom: calc(var(--nav-h) + 10px); overflow: hidden; }
 }
+/* QUERFORMAT (KAY): Pad NEBEN das Scoreboard — sonst sind die unteren Zahlen
+   hinter der Bottom-Rail / abgeschnitten. gtop ueber beide Spalten. */
+@media (max-width: 939px) and (orientation: landscape) {
+  .view-game { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-content: start; column-gap: 14px; }
+  .gtop { grid-column: 1 / -1; }
+  .scorecards, .checkout-banner, .visitbar { grid-column: 1; }
+  .pad { grid-column: 2; margin-top: 0; }
+}
 
 /* ---------- Bausteine ---------- */
 .panel {
