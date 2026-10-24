@@ -98,9 +98,13 @@ export function mountCam(host, onThrow, onStatus) {
     return;
   }
   host.dataset.camMounted = '1';
-  const v = el('video', { autoplay: '', playsinline: '', muted: '', style: 'width:100%;height:clamp(220px,44vh,440px);object-fit:cover;background:#000;display:block;border-radius:12px' });
-  const note = el('div', { class: 'small muted', style: 'text-align:center;margin-top:2px;font-size:9.5px;line-height:1.25' }, 'Kamera startet…');
-  host.append(v, note);
+  const frame = el('div', { style: 'width:100%;height:clamp(260px,54vh,470px);overflow:hidden;border-radius:14px;background:#000;position:relative' });
+  const v = el('video', { autoplay: '', playsinline: '', muted: '', style: 'width:100%;height:100%;object-fit:cover;display:block;transform-origin:center' });
+  const zoom = el('input', { type: 'range', min: 100, max: 300, value: 100, style: 'width:100%;margin:6px 0 0' });
+  zoom.oninput = () => { v.style.transform = `scale(${zoom.value / 100})`; };
+  const note = el('div', { class: 'small muted', style: 'text-align:center;margin-top:2px;font-size:10.5px;line-height:1.25' }, 'Kamera startet…');
+  frame.append(v);
+  host.append(frame, zoom, note);
   video = v; // Modul-Referenz fuer frameGrab/startAuto
   const phase = { m: 'idle' };
   v.onclick = async (ev) => {
