@@ -24,11 +24,22 @@ function frameGrab() {
 export function findeNeuenPfeil(a, b) { setEngineCal(cal); return _finde(a, b, cal); }
 
 export async function startCam(deviceId) {
-  if (!deviceId) { try { deviceId = localStorage.getItem('dartpro.camera.lens') || null; } catch (e) {} } // gespeicherte Weitwinkel-Linse
+  const gespeichertesLabel = (() => { try { return localStorage.getItem('dartpro.camera.lenslabel') || ''; } catch (e) { return ''; } })();
   if (stream) { // Stream laeuft evtl. schon (alter View) -> NEUES Video anbinden!
     video.srcObject = stream;
     try { await video.play(); } catch (e) {}
     return true;
+  }
+  // Ohne explizite deviceId: Weitwinkel-Linse per LABEL waehlen (IDs sind je Start neu!)
+  if (!deviceId && gespeichertesLabel) {
+    try {
+      // Erst einmal kurz default oeffnen (macht Permissions + echte Labels verfuegbar)
+      const probe = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      const devs = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+      const treffer = devs.find(d => d.label === gespeichertesLabel);
+      probe.getTracks().forEach(t => t.stop());
+      if (treffer && treffer.deviceId) deviceId = treffer.deviceId;
+    } catch (e) { /* Probe fehlgeschlagen: default nutzen */ }
   }
   try {
     stream = await navigator.mediaDevices.getUserMedia({
@@ -178,7 +189,7 @@ export function renderCamera(view) {
           class: 'chip', onclick: async (e) => {
             [...lensRow.children].forEach(c => c.classList.remove('on'));
             e.currentTarget.classList.add('on');
-            localStorage.setItem('dartpro.camera.lens', d.deviceId); // KAY: Linse merken - SPIEL nutzt sie ab sofort
+            localStorage.setItem('dartpro.camera.lenslabel', d.label || ''); // KAY: per LABEL (deviceIds aendern sich je Start)
             stopCam();
             const ok = await startCam(d.deviceId);
             status.textContent = ok ? 'Linse ' + (i + 1) + ' gespeichert - Spiel nutzt sie jetzt!' : 'Linse ' + (i + 1) + ' ging nicht';

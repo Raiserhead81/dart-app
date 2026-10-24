@@ -240,6 +240,8 @@ function renderX01Game(view) {
       document.body.append(h);
       const vg = document.querySelector('.view-game');
       if (vg) { vg.style.paddingTop = 'calc(55vh + 10px)'; vg.style.minHeight = '0'; vg.style.height = 'auto'; }
+      const quit = el('button', { class: 'gbtn danger', style: 'position:absolute;top:8px;right:8px;z-index:5', onclick: () => endEarly() }, 'Beenden');
+      h.append(quit);
       return h;
     })();
     mountCam(camHost, (seg) => {
