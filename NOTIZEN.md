@@ -12,5 +12,6 @@
 - callDart() bleibt als API (training + Tests), nur die Match-Flows rufen es nicht mehr auf.
 - settings.dartCalls-Toggle wirkt jetzt nur noch auf training.js.
 - Fullscreen (24.10.): manifest.json display:fullscreen + einmaliger requestFullscreen bei erster User-Geste (app.js), play.js hatte es schon beim Spielstart.
+- KEIN SCROLLEN (24.10.): fitGameScreen() in app.js skaliert .view-game per transform:scale auf den Viewport (Hoehe mitschrumpfen!). padBottom nur auf Mobile abziehen (Rail), Desktop zahlt voll. Regressionstest scripts/e2e-fit.mjs (390x700/820x1180/1280x800 => noScroll).
 - Server-Clips liegen in /var/www/dart-app-caller (nginx alias /caller/, ausserhalb des deploy-rsync).
 - Online-Match: callVisitEnd bekommt jetzt den echten Rest NACH dem Visit (vorher Bug: Rest vor dem Visit) + echte Visit-Summe via visitStartRest-Tracking.
