@@ -6,7 +6,7 @@
 import { el } from '/js/util.js';
 import { store } from '/js/app.js';
 
-import { segVonPixel as _segVonPixel, findeNeuenPfeil as _finde, setEngineCal, analyseBoardInFrame } from '/js/core/camera-engine.js';
+import { segVonPixel as _segVonPixel, findeNeuenPfeil as _finde, setEngineCal, analyseBoardInFrame, tapZuVideoPixel as _tapZuVideoPixel } from '/js/core/camera-engine.js';
 
 let stream = null, video = null, canvas = null, ctx = null;
 let recorder = null, recChunks = [], recOnStop = null;
@@ -229,19 +229,13 @@ export function mountCam(host, onThrow, onStatus) {
 export function tapEingabeAnbinden(videoEl, onThrow, onKalibHinweis) {
   videoEl.addEventListener('click', (ev) => {
     if (!cal) { if (onKalibHinweis) onKalibHinweis(); return; }
-    // Zoom-sichere Umrechnung: offsetWidth = UNVERAENDERTE Elementgroesse,
-    // getBoundingClientRect = skaliert. Tap erst entzoomen, dann contain-mappen.
-    const ow = videoEl.offsetWidth || videoEl.videoWidth, oh = videoEl.offsetHeight || videoEl.videoHeight;
+    // BEWIESENE Core-Kette (tests/tap-kette.test.js): Finger -> Video -> Feld
     const rect = videoEl.getBoundingClientRect();
     const zoom = videoEl.style.transform ? (parseFloat(videoEl.style.transform.replace(/[^\d.]/g, '')) || 1) : 1;
-    const lx = (ev.clientX - rect.left) / zoom;
-    const ly = (ev.clientY - rect.top) / zoom;
-    const sc = Math.min(ow / (videoEl.videoWidth || ow), oh / (videoEl.videoHeight || oh));
-    const offX = (ow - (videoEl.videoWidth || ow) * sc) / 2;
-    const offY = (oh - (videoEl.videoHeight || oh) * sc) / 2;
-    const px = (lx - offX) / sc;
-    const py = (ly - offY) / sc;
-    const seg = segVonPixel(px, py, cal);
+    const p = _tapZuVideoPixel(ev.clientX, ev.clientY, rect.left, rect.top, rect.width, rect.height,
+      videoEl.offsetWidth || videoEl.videoWidth, videoEl.offsetHeight || videoEl.videoHeight,
+      videoEl.videoWidth || 1, videoEl.videoHeight || 1, zoom);
+    const seg = segVonPixel(p.x, p.y, cal);
     if (seg) onThrow(seg); else if (onKalibHinweis) onKalibHinweis();
   });
 }

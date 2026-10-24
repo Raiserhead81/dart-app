@@ -140,3 +140,14 @@ export function analyseBoardInFrame(img) {
   const r = rand.length >= 12 ? rand[Math.floor(rand.length / 2)] : rEst0;
   return { cx, cy, r, n, strahlen: rand.length };
 }
+
+
+// ---------- Tap-Kette (pure): Fingerposition -> Videopixel, zoom- und contain-sicher ----------
+export function tapZuVideoPixel(clientX, clientY, rectLeft, rectTop, rectW, rectH, offsetW, offsetH, videoW, videoH, zoom) {
+  const lx = (clientX - rectLeft) / zoom;
+  const ly = (clientY - rectTop) / zoom;
+  const sc = Math.min(offsetW / videoW, offsetH / videoH);
+  const offX = (offsetW - videoW * sc) / 2;
+  const offY = (offsetH - videoH * sc) / 2;
+  return { x: (lx - offX) / sc, y: (ly - offY) / sc };
+}
