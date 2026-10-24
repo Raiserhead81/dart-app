@@ -28,26 +28,21 @@ export function renderProfile(view) {
         videoHost.append(v);
         videoHost.style.display = '';
         kalibBtn.style.display = '';
-        status.textContent = 'Kamera startet…';
-        // Harte Begrenzung: manche WebViews loesen getUserMedia nie auf
-        const mitTimeout = (p, ms, msg) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(msg)), ms))]);
+        status.textContent = 'starte Kamera…';
+        window.__profilStream = null;
         try {
-          await mitTimeout(startCam(), 6000, 'timeout');
+          window.__profilStream = await Promise.race([
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false }),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('zu lange')), 7000))
+          ]);
+          v.srcObject = window.__profilStream;
+          await v.play().catch(() => {});
+          status.textContent = v.videoWidth ? 'Kamera läuft (' + v.videoWidth + 'px)' : 'warte auf Bild…';
         } catch (e) {
-          status.textContent = 'Kamera-Start problematisch (' + e.message + ') - versuche Standard-Kamera…';
+          status.textContent = 'FEHLER: ' + e.message;
         }
-        const st = aktuellerStream();
-        if (!st) {
-          // letzter Versuch: ganz ohne gespeicherte Linse
-          try {
-            localStorage.removeItem('dartpro.camera.lenslabel');
-            await mitTimeout(startCam(), 6000, 'timeout2');
-          } catch (e) { status.textContent = 'Kamera startet nicht - App neu starten'; return; }
-        }
-        v.srcObject = aktuellerStream();
-        try { await v.play(); } catch (e) {}
-        setTimeout(() => { status.textContent = v.videoWidth ? 'Kamera läuft (' + v.videoWidth + 'px)' : 'Kein Bild - Licht/Display prüfen'; }, 1500);
-        v.onclick = async (ev) => {
+      };
+      v.onclick = async (ev) => {
           if (phase === 'kalib-bull' || phase === 'kalib-rand') {
             const rect = v.getBoundingClientRect();
             const zoom = v.style.transform ? (parseFloat(v.style.transform.replace(/[^\d.]/g, '')) || 1) : 1;
@@ -60,13 +55,14 @@ export function renderProfile(view) {
             else { c.r = Math.abs(py - c.cy); setCal(c); saveCal(); phase = 'idle'; status.textContent = '✓ Manuell kalibriert (R=' + Math.round(c.r) + 'px)'; kalibBtn.textContent = 'Neu kalibrieren'; }
           }
         };
-      };
       kalibBtn.style.display = 'none';
       kalibBtn.onclick = async () => {
         const v = videoHost.querySelector('video');
         if (!v) { status.textContent = 'Erst Kamera anzeigen'; return; }
         kalibBtn.textContent = 'Kalibriere…';
-        const erg = await autoKalibriere(v);
+        const v2 = videoHost.querySelector('video');
+        if (!v2 || !v2.videoWidth) { kalibBtn.textContent = 'Erst Kamera anzeigen!'; return; }
+        const erg = await autoKalibriere(v2);
         if (erg) {
           setCal(erg); saveCal();
           kalibBtn.textContent = 'Neu kalibrieren';
