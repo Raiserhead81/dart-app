@@ -203,7 +203,7 @@ function renderX01Game(view) {
         e.currentTarget.classList.remove('danger');
       }
     }, title: 'Kamera zählt selbst' }, icon('i-target'), el('span', { class: 'hide-sm' }, session.useCamera ? 'Kamera: AN' : 'Kamera: AUS')),
-    matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches ? '' : el('button', { class: 'gbtn', onclick: () => { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) {} }, title: 'Vollbild' }, icon('i-target'), el('span', { class: 'hide-sm' }, 'Vollbild')),
+    (matchMedia('(display-mode: fullscreen), (display-mode: standalone)').matches || /; wv\)/.test(navigator.userAgent)) ? '' : el('button', { class: 'gbtn', onclick: () => { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen(); } catch (e) {} }, title: 'Vollbild' }, icon('i-target'), el('span', { class: 'hide-sm' }, 'Vollbild')),
     el('button', { class: 'gbtn danger', onclick: endEarly, title: 'Spiel beenden' }, el('span', {}, 'Beenden'))
   );
 
