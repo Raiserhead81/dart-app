@@ -107,7 +107,7 @@ export function mountCam(host, onThrow, onStatus) {
     return;
   }
   host.dataset.camMounted = '1';
-  const frame = el('div', { style: 'width:100%;height:clamp(320px,60vh,560px);overflow:hidden;border-radius:14px;background:#000;position:relative' });
+  const frame = el('div', { style: 'width:100%;height:min(75vh, 620px);overflow:hidden;border-radius:14px;background:#000;position:relative' });
   const v = el('video', { autoplay: '', playsinline: '', muted: '', style: 'width:100%;height:100%;object-fit:contain;display:block;transform-origin:center' });
   // KAY: Start MAXIMAL weit draussen (0,4x), dann gezielt reinziehen
   const zoomLabel = el('span', { class: 'small muted', style: 'float:right' }, '1,0x');
