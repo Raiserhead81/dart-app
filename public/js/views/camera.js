@@ -61,7 +61,11 @@ export function findeNeuenPfeil(a, b) {
 }
 
 export async function startCam() {
-  if (stream) return true;
+  if (stream) { // Stream laeuft evtl. schon (alter View) -> NEUES Video anbinden!
+    video.srcObject = stream;
+    try { await video.play(); } catch (e) {}
+    return true;
+  }
   try {
     stream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false
