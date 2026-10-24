@@ -112,6 +112,8 @@ export function stopCam() {
 
 // Kalibrierung speichern (Handy-Position vorausgesetzt)
 export function saveCal() { if (cal && store) { store.state.settings.cameraCal = cal; store.save(); } }
+export function camCalRef() { return cal; }
+export function setCal(c) { cal = c; }
 export function loadCal() {
   const c = store?.state?.settings?.cameraCal;
   if (c && c.cx && c.r) { cal = c; return true; }
@@ -390,4 +392,60 @@ export function renderCamera(view) {
       el('p', { class: 'small muted mt' }, 'Test-Modus: kalibrieren, Referenz, werfen, erkennen. Auto-Zaehlung im Spiel folgt als nächster Schritt.')
     )
   );
+}
+
+// ---------- ECHTE Auto-Kalibrierung: Board aus den rot/gruenen Sektoren finden ----------
+function analyseBoardInFrame(img) {
+  // img: ImageData (runterskaliert ~270px breit). Liefert {cx, cy, r} oder null.
+  const W = img.width, H = img.height, D = img.data;
+  let sx = 0, sy = 0, n = 0;
+  const punkte = [];
+  for (let y = 2; y < H - 2; y += 2) {
+    for (let x = 2; x < W - 2; x += 2) {
+      const i = (y * W + x) * 4;
+      const r = D[i], g = D[i + 1], b = D[i + 2];
+      const istRot = r > 70 && r > g + 28 && r > b + 28;
+      const istGruen = g > 45 && g > r + 16 && g > b + 6 && (g + r) > 90;
+      if (istRot || istGruen) { punkte.push([x, y]); sx += x; sy += y; n++; }
+    }
+  }
+  if (n < 40) return null;
+  let cx = sx / n, cy = sy / n;
+  // 2 Runden Verfeinerung: Ausreisser raus, neu mitteln, Radius aus 97%-Quantil
+  for (let runde = 0; runde < 2; runde++) {
+    const dists = punkte.map(p => Math.hypot(p[0] - cx, p[1] - cy));
+    dists.sort((a, b) => a - b);
+    const rMax = dists[Math.floor(dists.length * 0.97)] || 0;
+    const innen = punkte.filter((p, i) => dists[i] <= rMax * 1.02);
+    cx = innen.reduce((a, p) => a + p[0], 0) / innen.length;
+    cy = innen.reduce((a, p) => a + p[1], 0) / innen.length;
+    punkte.sort((a, b) => Math.hypot(a[0] - cx, a[1] - cy) - Math.hypot(b[0] - cx, b[1] - cy));
+  }
+  const dists2 = punkte.map(p => Math.hypot(p[0] - cx, p[1] - cy)).sort((a, b) => a - b);
+  let r = dists2[Math.floor(dists2.length * 0.97)];
+  // Double-Aussenkante = aeusserste R/G-Pixel => r ist bereits der Board-Radius
+  return { cx, cy, r, n: punkte.length };
+}
+
+export function autoKalibriere(videoEl) {
+  // 5 Frames im Abstand analysieren, Median aus den guten Ergebnissen
+  return new Promise(async (resolve) => {
+    const ergs = [];
+    for (let f = 0; f < 5; f++) {
+      try {
+        const c = document.createElement('canvas');
+        const zielW = 270;
+        c.width = zielW; c.height = Math.round(zielW * videoEl.videoHeight / videoEl.videoWidth);
+        c.getContext('2d', { willReadFrequently: true }).drawImage(videoEl, 0, 0, zielW, c.height);
+        const data = c.getContext('2d').getImageData(0, 0, zielW, c.height);
+        const e = analyseBoardInFrame(data);
+        if (e && e.r > 25 && e.r < zielW * 0.75) ergs.push(e);
+      } catch (err) { /* Frame-Drop */ }
+      await new Promise(r => setTimeout(r, 250));
+    }
+    if (ergs.length < 3) { resolve(null); return; }
+    const med = (arr, key) => { const v = arr.map(e => e[key]).sort((a, b) => a - b); return v[Math.floor(v.length / 2)]; };
+    const skal = videoEl.videoWidth / 270;
+    resolve({ cx: med(ergs, 'cx') * skal, cy: med(ergs, 'cy') * skal, r: med(ergs, 'r') * skal });
+  });
 }
