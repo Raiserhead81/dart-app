@@ -58,3 +58,17 @@
   2. glm vermisst Scheibe im STREAM-Raum (nicht Foto-Raum!) 3. cameraCal direkt
   setzen (ohne Kay-Tipps) 4. Kay testet Taps. Alternativ Kay kalibriert neu mit
   der neuen Feintuning-Version (Bull-Kontrolltipp).
+
+## FINALER STAND 24./25.10. (Session-Ende, alles auf main gemerged)
+- KAMERA KOMPLETT: v5-Engine (PCA-Ellipsen-Fit, Normierraum, Phasen-Rotation,
+  Pfeil als starrer Koerper mit Breitenprofil), Bounce-Out-Schutz (nach OMNI-Recherche),
+  max. Handy-Cam-Optimierung (1920p/30fps, Fokus continuous-video, Torch-Button),
+  Profil-Kamerastudio (Kamera+Weitwinkel-Auto+Zoom+Auto-Kalibrierung+manueller Fallback),
+  Tap-Eingabe im Spiel mit TIPP-JETZT-Banner + GESPEICHERT-Bestaetigung
+- 169 Unit-Tests gruen inkl. Schraegsicht/Dunkelheit/Rotation/Zoom-Tap-Beweise
+- Diagnose-Skripte im Repo: e2e-browser-analyse, e2e-kamera-sim, console-check u.a.
+- NOCH OFFEN (naechste Session): BUST/ph-din-Clips per Gemini sauber generieren
+  (Edge-TTS-Interims), Daniel-rest-Clips, Kays 4 Verkaufsentscheidungen (PLAN.md),
+  Auto-Erkennung an echter Scheibe final verifizieren (Kay-Quote einholen)
+- Omni-Recherche: 4 Kameras = 99,7% - Single-Cam Grenze ~90-95%. 2. Handy als
+  Zweitkamera = moeglicher Ausbau (gratis), Kay wollte erst keine Hardware kaufen
