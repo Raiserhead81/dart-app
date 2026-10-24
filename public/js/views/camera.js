@@ -6,7 +6,7 @@
 import { el } from '/js/util.js';
 import { store } from '/js/app.js';
 
-import { segVonPixel as _segVonPixel, findeNeuenPfeil as _finde, setEngineCal } from '/js/core/camera-engine.js';
+import { segVonPixel as _segVonPixel, findeNeuenPfeil as _finde, setEngineCal, analyseBoardInFrame } from '/js/core/camera-engine.js';
 
 let stream = null, video = null, canvas = null, ctx = null;
 let recorder = null, recChunks = [], recOnStop = null;
@@ -395,71 +395,6 @@ export function renderCamera(view) {
 }
 
 // ---------- ECHTE Auto-Kalibrierung: Board aus den rot/gruenen Sektoren finden ----------
-function analyseBoardInFrame(img) {
-  // img: ImageData (runterskaliert ~270px breit). Liefert {cx, cy, r} oder null.
-  const W = img.width, H = img.height, D = img.data;
-  // NACHTSICHT: Kontraststreckung (min->0, max->255 je Kanal) + relative Farben.
-  // Dunkle Zimmer-Woitwinkel-Streams haben kaum Sattigung - ohne das findet
-  // die Farbanalyse NULL Sektoren-Pixel.
-  let maxR = 1, maxG = 1, maxB = 1;
-  for (let i = 0; i < D.length; i += 16) { if (D[i] > maxR) maxR = D[i]; if (D[i + 1] > maxG) maxG = D[i + 1]; if (D[i + 2] > maxB) maxB = D[i + 2]; }
-  const norm = (v, max) => Math.min(255, v * 255 / max);
-  // relative Sektoren-Farben: Kanal muss DOMINANT sein, nicht absolut hell
-  const istRotPx = (r, g, b) => norm(r, maxR) > 45 && norm(r, maxR) > norm(g, maxG) * 1.3 && norm(r, maxR) > norm(b, maxB) * 1.3;
-  const istGruenPx = (r, g, b) => norm(g, maxG) > 38 && norm(g, maxG) > norm(r, maxR) * 1.25 && norm(g, maxG) > norm(b, maxB) * 1.12;
-  let sx = 0, sy = 0, n = 0;
-  const punkte = [];
-  for (let y = 2; y < H - 2; y += 2) {
-    for (let x = 2; x < W - 2; x += 2) {
-      const i = (y * W + x) * 4;
-      const r = D[i], g = D[i + 1], b = D[i + 2];
-      if (istRotPx(r, g, b) || istGruenPx(r, g, b)) { punkte.push([x, y]); sx += x; sy += y; n++; }
-    }
-  }
-  if (n < 40) return null;
-  let cx = sx / n, cy = sy / n;
-  // 2 Runden Verfeinerung: Ausreisser raus, neu mitteln
-  for (let runde = 0; runde < 2; runde++) {
-    const dists = punkte.map(p => Math.hypot(p[0] - cx, p[1] - cy));
-    dists.sort((a, b) => a - b);
-    const rMax = dists[Math.floor(dists.length * 0.97)] || 0;
-    const innen = punkte.filter((p, i) => dists[i] <= rMax * 1.02);
-    cx = innen.reduce((a, p) => a + p[0], 0) / innen.length;
-    cy = innen.reduce((a, p) => a + p[1], 0) / innen.length;
-    punkte.sort((a, b) => Math.hypot(a[0] - cx, a[1] - cy) - Math.hypot(b[0] - cx, b[1] - cy));
-  }
-  // PIXELGENAU Stufe 1: BULL-Zentrum = gewichteter Schwerpunkt des dunkelsten Kerns
-  let bsum = 0, bx = 0, by = 0;
-  const rEst0 = punkte.length ? Math.hypot(punkte[punkte.length - 1][0] - cx, punkte[punkte.length - 1][1] - cy) : 0;
-  const fenster = Math.max(4, rEst0 * 0.22);
-  for (let y = Math.max(0, cy - fenster) | 0; y < Math.min(H, cy + fenster); y++) {
-    for (let x = Math.max(0, cx - fenster) | 0; x < Math.min(W, cx + fenster); x++) {
-      const i = (y * W + x) * 4;
-      const grau = (D[i] + D[i + 1] + D[i + 2]) / 3;
-      const grauN = norm(grau, max((maxR + maxG + maxB) / 3, 1));
-      if (grauN < 70) { const w = (70 - grauN) * (70 - grauN); bsum += w; bx += x * w; by += y * w; }
-    }
-  }
-  if (bsum > 30) { cx = bx / bsum; cy = by / bsum; }
-  // PIXELGENAU Stufe 2: Radius = Mittel der aeussersten R/G-Pixel je Strahl (24 Winkel)
-  const strahlen = 24, rand = [];
-  for (let a = 0; a < strahlen; a++) {
-    const rad = a / strahlen * 2 * Math.PI;
-    let letzte = 0;
-    for (let rr = rEst0 * 1.05; rr > rEst0 * 0.3; rr -= 1) {
-      const x = Math.round(cx + Math.cos(rad) * rr), y = Math.round(cy + Math.sin(rad) * rr);
-      if (x < 0 || y < 0 || x >= W || y >= H) continue;
-      const i = (y * W + x) * 4;
-      const r2 = D[i], g2 = D[i + 1], b2 = D[i + 2];
-      if (istRotPx(r2, g2, b2) || istGruenPx(r2, g2, b2)) { letzte = rr; break; }
-    }
-    if (letzte > 0) rand.push(letzte);
-  }
-  rand.sort((a, b) => a - b);
-  // Median der Strahl-Rander (robust gegen einzelne verdeckte Winkel)
-  let r = rand.length >= 12 ? rand[Math.floor(rand.length / 2)] : (punkte.length ? Math.hypot(punkte[punkte.length - 1][0] - cx, punkte[punkte.length - 1][1] - cy) : 0);
-  return { cx, cy, r, n: punkte.length, strahlen: rand.length };
-}
 
 export function autoKalibriere(videoEl) {
   // 5 Frames im Abstand analysieren, Median aus den guten Ergebnissen

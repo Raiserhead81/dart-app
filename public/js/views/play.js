@@ -17,7 +17,7 @@ import { padThrow, padSpecial, pushSnapshot, popSnapshot, checkoutLine, HAPTIC }
 import { activePlayer, store, rerender } from '/js/app.js';
 import { cricketMarksTable } from '/js/views/cricket-ui.js';
 import { mountCam, unmountCam, toggleAufnahme, tapEingabeAnbinden, autoKalibriere } from '/js/views/camera.js';
-import { saveCal, setCal } from '/js/views/camera.js';
+import { saveCal, setCal, camCalRef } from '/js/views/camera.js';
 
 const STARTS = [101, 170, 301, 501, 701, 1001];
 const restTickMemo = {}; // letzter Rest je Spieler — fuer den Score-Tick beim Wechsel
@@ -257,7 +257,7 @@ function renderX01Game(view) {
           setCal(erg); saveCal();
           kalibBtn.textContent = '✓ Kalibriert (R=' + Math.round(erg.r) + 'px) - nochmal';
           camHinweis.textContent = 'KALIBRIERT ✓ - wirf und tippe deine Treffer';
-          // ERKANNTES BOARD ALS OVERLAY ZEICHNEN: Kreis, Bull, 20 Sektoren - 4s sichtbar
+          // ERKANNTES BOARD ALS OVERLAY: Raster bleibt dauerhaft sichtbar
           zeichneBoardOverlay(v, erg);
           setTimeout(() => { kalibBtn.textContent = 'Scheibe neu kalibrieren'; }, 2500);
         } else {
@@ -284,6 +284,7 @@ function renderX01Game(view) {
     // KAY: TAP-AUF-DIE-SCHEIBE - Kamerabild ist das Eingabepad
     setTimeout(() => {
       const v = document.querySelector('#camhost video');
+      if (v && camCalRef()) zeichneBoardOverlay(v, camCalRef());
       if (v) tapEingabeAnbinden(v, (seg) => {
         firePad(session, view, () => makeThrow(seg.k === 'outer' ? 'outer' : seg.k, seg.n));
         camHinweis.textContent = '✓ ' + seg.label + ' GESPEICHERT';
@@ -637,7 +638,8 @@ function zeichneBoardOverlay(videoEl, cal) {
     ctx.lineTo(X(cal.cx + Math.sin(a) * cal.r), Y(cal.cy - Math.cos(a) * cal.r));
     ctx.stroke();
   }
-  setTimeout(() => ctx.clearRect(0, 0, c.width, c.height), 4000);
+  // KAY: Raster bleibt DAUERHAFT sichtbar (mit-zoomend via redraw-Aufruf)
+  window.__boardRedraw = () => { try { zeichneBoardOverlay(v, camCalRef()); } catch (e) {} };
 }
 
 function endEarly() {

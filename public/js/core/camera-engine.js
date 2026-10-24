@@ -63,3 +63,67 @@ export function findeNeuenPfeil(a, b, calOverride) {
   if (sn < 3) { for (const [x, y, w] of px) { sw += w; sx += x * w; sy += y * w; } }
   return { x: sx / sw, y: sy / sw, staerke: maxD, pixel: px.length };
 }
+
+
+// ---------- Auto-Kalibrierung (pure, testbar) ----------
+export function normalisiereFrame(D) {
+  // Kontraststreckung je Kanal (Nachtsicht): dunkle Streams bekommen Farbe zurueck
+  let maxR = 1, maxG = 1, maxB = 1;
+  for (let i = 0; i < D.length; i += 16) { if (D[i] > maxR) maxR = D[i]; if (D[i + 1] > maxG) maxG = D[i + 1]; if (D[i + 2] > maxB) maxB = D[i + 2]; }
+  return { maxR, maxG, maxB };
+}
+
+export function analyseBoardInFrame(img) {
+  const W = img.width, H = img.height, D = img.data;
+  const { maxR, maxG, maxB } = normalisiereFrame(D);
+  const norm = (v, max) => Math.min(255, v * 255 / max);
+  const istRotPx = (r, g, b) => norm(r, maxR) > 45 && norm(r, maxR) > norm(g, maxG) * 1.3 && norm(r, maxR) > norm(b, maxB) * 1.3;
+  const istGruenPx = (r, g, b) => norm(g, maxG) > 38 && norm(g, maxG) > norm(r, maxR) * 1.25 && norm(g, maxG) > norm(b, maxB) * 1.12;
+  const punkte = [];
+  let sx = 0, sy = 0, n = 0;
+  for (let y = 2; y < H - 2; y += 2) {
+    for (let x = 2; x < W - 2; x += 2) {
+      const i = (y * W + x) * 4;
+      if (istRotPx(D[i], D[i + 1], D[i + 2]) || istGruenPx(D[i], D[i + 1], D[i + 2])) {
+        punkte.push([x, y]); sx += x; sy += y; n++;
+      }
+    }
+  }
+  if (n < 40) return null;
+  let cx = sx / n, cy = sy / n;
+  for (let runde = 0; runde < 2; runde++) {
+    const dists = punkte.map(p => Math.hypot(p[0] - cx, p[1] - cy)).sort((a, b) => a - b);
+    const rMax = dists[Math.floor(dists.length * 0.97)] || 0;
+    const innen = punkte.filter(p => Math.hypot(p[0] - cx, p[1] - cy) <= rMax * 1.02);
+    cx = innen.reduce((a, p) => a + p[0], 0) / innen.length;
+    cy = innen.reduce((a, p) => a + p[1], 0) / innen.length;
+  }
+  // Bull-Kern: dunkelster Schwerpunkt im Innenbereich
+  let bsum = 0, bx = 0, by = 0;
+  const distsAll = punkte.map(p => Math.hypot(p[0] - cx, p[1] - cy)).sort((a, b) => a - b);
+  const rEst0 = distsAll[distsAll.length - 1] || 1;
+  const maxGrau = Math.max((maxR + maxG + maxB) / 3, 1);
+  const fenster = Math.max(4, rEst0 * 0.22);
+  for (let y = Math.max(0, cy - fenster) | 0; y < Math.min(H, cy + fenster); y++) {
+    for (let x = Math.max(0, cx - fenster) | 0; x < Math.min(W, cx + fenster); x++) {
+      const i = (y * W + x) * 4;
+      const grauN = ((D[i] + D[i + 1] + D[i + 2]) / 3) * 255 / maxGrau;
+      if (grauN < 70) { const w = (70 - grauN) * (70 - grauN); bsum += w; bx += x * w; by += y * w; }
+    }
+  }
+  if (bsum > 30) { cx = bx / bsum; cy = by / bsum; }
+  // Radius: aeusserste Sektoren-Pixel je Strahl (24 Winkel), Median
+  const rand = [];
+  for (let a = 0; a < 24; a++) {
+    const rad = a / 24 * 2 * Math.PI;
+    for (let rr = rEst0 * 1.08; rr > rEst0 * 0.3; rr -= 1) {
+      const x = Math.round(cx + Math.cos(rad) * rr), y = Math.round(cy + Math.sin(rad) * rr);
+      if (x < 0 || y < 0 || x >= W || y >= H) continue;
+      const i = (y * W + x) * 4;
+      if (istRotPx(D[i], D[i + 1], D[i + 2]) || istGruenPx(D[i], D[i + 1], D[i + 2])) { rand.push(rr); break; }
+    }
+  }
+  rand.sort((a, b) => a - b);
+  const r = rand.length >= 12 ? rand[Math.floor(rand.length / 2)] : rEst0;
+  return { cx, cy, r, n, strahlen: rand.length };
+}
