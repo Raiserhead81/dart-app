@@ -55,19 +55,6 @@ export function renderProfile(view) {
           else { c.r = Math.abs(py - c.cy); setCal(c); saveCal(); phase = 'idle'; status.textContent = '✓ Manuell kalibriert (R=' + Math.round(c.r) + 'px)'; kalibBtn.textContent = 'Neu kalibrieren'; }
         };
       };
-      v.onclick = async (ev) => {
-          if (phase === 'kalib-bull' || phase === 'kalib-rand') {
-            const rect = v.getBoundingClientRect();
-            const zoom = v.style.transform ? (parseFloat(v.style.transform.replace(/[^\d.]/g, '')) || 1) : 1;
-            const lx = (ev.clientX - rect.left) / zoom, ly = (ev.clientY - rect.top) / zoom;
-            const sc = Math.min(v.offsetWidth / (v.videoWidth || v.offsetWidth), v.offsetHeight / (v.videoHeight || v.offsetHeight));
-            const px = (lx - (v.offsetWidth - (v.videoWidth || v.offsetWidth) * sc) / 2) / sc;
-            const py = (ly - (v.offsetHeight - (v.videoHeight || v.offsetHeight) * sc) / 2) / sc;
-            const c = camCalRef() || { cx: 0, cy: 0, r: 100 };
-            if (phase === 'kalib-bull') { c.cx = px; c.cy = py; c.r = c.r || 100; setCal(c); phase = 'kalib-rand'; status.textContent = 'Jetzt UNTERE äußere Doppelkante antippen'; }
-            else { c.r = Math.abs(py - c.cy); setCal(c); saveCal(); phase = 'idle'; status.textContent = '✓ Manuell kalibriert (R=' + Math.round(c.r) + 'px)'; kalibBtn.textContent = 'Neu kalibrieren'; }
-          }
-        };
       kalibBtn.style.display = 'none';
       kalibBtn.onclick = async () => {
         const v = videoHost.querySelector('video');
