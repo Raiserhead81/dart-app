@@ -78,6 +78,85 @@ export function stopCam() {
   if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
 }
 
+// Kalibrierung speichern (Handy-Position vorausgesetzt)
+export function saveCal() { if (cal && store) { store.state.settings.cameraCal = cal; store.save(); } }
+export function loadCal() {
+  const c = store?.state?.settings?.cameraCal;
+  if (c && c.cx && c.r) { cal = c; return true; }
+  return false;
+}
+export function istKalibriert() { return !!cal; }
+
+// AUTO-MODUS: pollt Frames, findet NEUE Pfeile (stabil = 2 Treffer gleiche Stelle),
+// ruft onThrow(seg) und aktualisiert das Referenzbild. stopAuto() beendet.
+let autoTimer = null, autoBusy = false;
+export function startAuto(onThrow, onStatus) {
+  if (autoTimer || !stream) return;
+  let lastFrame = frameGrab();
+  let pending = null; // {x, y, count}
+  autoTimer = setInterval(async () => {
+    if (autoBusy || !video.videoWidth) return;
+    autoBusy = true;
+    try {
+      const now = frameGrab();
+      const p = findeNeuenPfeil(lastFrame, now);
+      if (p && cal) {
+        const seg = segVonPixel(p.x, p.y, cal);
+        const selbeStelle = pending && Math.abs(pending.x - p.x) < 18 && Math.abs(pending.y - p.y) < 18;
+        if (selbeStelle && pending.count >= 1 && seg) {
+          // 2 Frames stabil + gueltiges Segment => Wurf!
+          onThrow(seg);
+          lastFrame = frameGrab();
+          pending = null;
+        } else {
+          pending = { x: p.x, y: p.y, count: selbeStelle ? pending.count + 1 : 0 };
+        }
+      } else if (!p) {
+        pending = null;
+      }
+    } catch (e) { /* Frame-Drop */ }
+    autoBusy = false;
+  }, 850);
+  if (onStatus) onStatus('live');
+}
+export function stopAuto() { if (autoTimer) { clearInterval(autoTimer); autoTimer = null; } }
+export function camCal() { return cal; }
+
+// SPIEL-EINBAU: Kamera-PiP in beliebigem Host-Element + Auto-Zaehlung.
+// onThrow(seg) wird bei jedem erkannten Dart gerufen. Kalibrierung per Tap aufs PiP.
+export function mountCam(host, onThrow, onStatus) {
+  const v = el('video', { autoplay: '', playsinline: '', muted: '', style: 'width:100%;max-width:340px;border-radius:12px;background:#000;display:block;margin:0 auto' });
+  const note = el('div', { class: 'small muted', style: 'text-align:center;margin-top:4px' }, 'Kamera startet…');
+  host.append(v, note);
+  video = v; // Modul-Referenz fuer frameGrab/startAuto
+  const phase = { m: 'idle' };
+  v.onclick = async (ev) => {
+    if (phase.m !== 'kalib') return;
+    const r = v.getBoundingClientRect();
+    const px = (ev.clientX - r.left) / r.width * (v.videoWidth || r.width);
+    const py = (ev.clientY - r.top) / r.height * (v.videoHeight || r.height);
+    if (!cal) { cal = { cx: px, cy: py, r: 100 }; note.textContent = 'Jetzt UNTERE Doppel-Aussenseite antippen'; }
+    else if (cal.r === 100 && py !== cal.cy) {
+      cal.r = Math.abs(py - cal.cy);
+      saveCal();
+      note.textContent = 'Kalibriert! Kamera zaehlt jetzt selbst mit.';
+      phase.m = 'run';
+      startAuto(onThrow, onStatus);
+    }
+  };
+  (async () => {
+    const ok = await startCam();
+    if (!ok) { note.textContent = 'Kamera verweigert - Kamera-Assistent in der APK?'; return; }
+    if (istKalibriert()) { note.textContent = 'Kamera live (kalibriert) - wirf!'; startAuto(onThrow, onStatus); }
+    else { note.textContent = 'TIPPE aufs Bild: erst BULL-Zentrum, dann untere Doppelkante'; phase.m = 'kalib'; }
+  })();
+}
+
+export function unmountCam() {
+  stopAuto();
+  stopCam();
+}
+
 export function renderCamera(view) {
   view.className = 'view';
   const status = el('div', { class: 'small muted', id: 'camstatus' }, 'Kamera aus');
@@ -116,6 +195,7 @@ export function renderCamera(view) {
       phase.mode = 'kalib-rand';
     } else if (phase.mode === 'kalib-rand') {
       cal.r = Math.abs(py - cal.cy);
+      saveCal();
       status.textContent = `Kalibriert (R=${Math.round(cal.r)}px). Jetzt: „Referenzbild aufnehmen“, dann Dart werfen, dann „Wurf erkennen“`;
       phase.mode = 'idle';
       erkenne.style.display = '';

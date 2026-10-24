@@ -16,6 +16,7 @@ import { turnHoldMs } from '/js/core/turnhold.js';
 import { padThrow, padSpecial, pushSnapshot, popSnapshot, checkoutLine, HAPTIC } from '/js/core/pad.js';
 import { activePlayer, store, rerender } from '/js/app.js';
 import { cricketMarksTable } from '/js/views/cricket-ui.js';
+import { mountCam, unmountCam } from '/js/views/camera.js';
 
 const STARTS = [101, 170, 301, 501, 701, 1001];
 const restTickMemo = {}; // letzter Rest je Spieler — fuer den Score-Tick beim Wechsel
@@ -34,6 +35,7 @@ export function renderPlay(view, arg) {
 
 /* ---------------- Setup ---------------- */
 function renderSetup(view) {
+  try { unmountCam(); } catch (e) {} // Spiel vorbei => Kamera aus
   const profiles = store.state.profiles.map(p => p.name);
   const names = [...new Set([activePlayer(), ...profiles, 'Spieler 2', 'Spieler 3', 'Spieler 4'])].slice(0, 4);
   // KAY-NEU: gemerkte Voreinstellung — zuletzt genutzte Kombi ist vorausgewaehlt
@@ -95,7 +97,8 @@ function renderSetup(view) {
   const outBtn = toggleChip('Double Out', true, v => sel.doubleOut = v);
   const inBtn = toggleChip('Double In', false, v => sel.doubleIn = v);
   const boardBtn = toggleChip('Dartboard-Eingabe (Overlay)', false, v => sel.useBoard = v);
-  const x01opts = el('div', {}, el('div', { class: 'row mt' }, outBtn, inBtn, boardBtn));
+  const camBtn = toggleChip('KAMERA zählt selbst', false, v => sel.useCamera = v);
+  const x01opts = el('div', {}, el('div', { class: 'row mt' }, outBtn, inBtn, boardBtn, camBtn));
 
   const startBtn = el('button', {
     class: 'btn primary wide mt', onclick: () => {
@@ -103,10 +106,10 @@ function renderSetup(view) {
       if (!chosen.length) return toast('Mindestens ein Spielername');
       if (sel.mode === 'x01') {
         const st = newX01({ start: sel.start, players: chosen, doubleOut: sel.doubleOut, doubleIn: sel.doubleIn, firstTo: sel.firstTo, setsTo: sel.setsTo, id: uid() });
-        store.state.session = { type: 'x01', state: st, snapshots: [], useBoard: sel.useBoard, date: new Date().toISOString() };
+        store.state.session = { type: 'x01', state: st, snapshots: [], useBoard: sel.useBoard, useCamera: !!sel.useCamera, date: new Date().toISOString() };
       } else {
         const st = newCricket({ players: chosen, cutThroat: sel.mode === 'cutthroat' });
-        store.state.session = { type: 'cricket', state: st, snapshots: [], useBoard: sel.useBoard, date: new Date().toISOString() };
+        store.state.session = { type: 'cricket', state: st, snapshots: [], useBoard: sel.useBoard, useCamera: !!sel.useCamera, date: new Date().toISOString() };
       }
       store.state.settings.lastMode = sel.mode;
       store.state.settings.lastStart = sel.start;
@@ -507,6 +510,7 @@ function endEarly() {
 
 /* ---- Abschluss ---- */
 export function finishSession(session, aborted, ev = null) {
+  try { unmountCam(); } catch (e) {}
   window.__DARTPRO_SESSION_ACTIVE = false;
   const st = session.state;
   const date = session.date || new Date().toISOString();
@@ -606,6 +610,21 @@ function renderCricketGame(view) {
   );
   pad.append(modeRow, grid, special);
   view.append(pad);
+
+  // KAY: KAMERA VOLLAUTO - PiP oben, erkennt Wuerfe, zaehlt SELBST (3s Korrektur)
+  if (session.useCamera) {
+    const camHost = el('div', { style: 'order:-1' });
+    view.prepend(camHost);
+    mountCam(camHost, (seg) => {
+      // Automatischer Wurf - gleiche Pipeline wie das Pad
+      const korrektur = el('div', { style: 'position:fixed;left:50%;transform:translateX(-50%);bottom:86px;z-index:60;background:var(--red-deep);border:1px solid var(--red);border-radius:12px;padding:10px 16px;font-weight:900;font-size:14px;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.5)' },
+        el('span', {}, `${seg.label} GEZÄHLT — falsch? `),
+        el('button', { class: 'btn small', onclick: () => { korrektur.remove(); undo(session); toast('Zurückgenommen - bitte manuell tippen'); } }, 'korrigieren'));
+      document.body.append(korrektur);
+      setTimeout(() => korrektur.remove(), 3000);
+      firePad(session, view, () => makeThrow(seg.k === 'outer' ? 'outer' : seg.k, seg.n));
+    }, (st) => { /* status */ });
+  }
 }
 
 function fireCricket(session, t, view) {
