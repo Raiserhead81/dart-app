@@ -257,6 +257,8 @@ function renderX01Game(view) {
           setCal(erg); saveCal();
           kalibBtn.textContent = '✓ Kalibriert (R=' + Math.round(erg.r) + 'px) - nochmal';
           camHinweis.textContent = 'KALIBRIERT ✓ - wirf und tippe deine Treffer';
+          // ERKANNTES BOARD ALS OVERLAY ZEICHNEN: Kreis, Bull, 20 Sektoren - 4s sichtbar
+          zeichneBoardOverlay(v, erg);
           setTimeout(() => { kalibBtn.textContent = 'Scheibe neu kalibrieren'; }, 2500);
         } else {
           kalibBtn.textContent = 'Nicht gefunden - nochmal (gutes Licht!)';
@@ -599,6 +601,43 @@ function undo(session) {
   clearQueue();
   buzz(HAPTIC.tap);
   rerender();
+}
+
+// KAY: Erkanntes Board-Raster uebers Kamerabild zeichnen (Erfolgskontrolle)
+function zeichneBoardOverlay(videoEl, cal) {
+  let c = document.getElementById('camoverlay');
+  if (!c) {
+    c = el('canvas', { id: 'camoverlay', style: 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:4' });
+    videoEl.parentElement.append(c);
+  }
+  const box = videoEl.getBoundingClientRect();
+  c.width = box.width; c.height = box.height;
+  const ctx = c.getContext('2d');
+  const ow = videoEl.offsetWidth, oh = videoEl.offsetHeight;
+  const zoom = videoEl.style.transform ? (parseFloat(videoEl.style.transform.replace(/[^\d.]/g, '')) || 1) : 1;
+  const sc = Math.min(ow / videoEl.videoWidth, oh / videoEl.videoHeight);
+  const dispScale = sc * zoom;
+  const vx = (ow - videoEl.videoWidth * sc) / 2 * zoom + (box.width - ow * zoom) / 2;
+  const vy = (oh - videoEl.videoHeight * sc) / 2 * zoom + (box.height - oh * zoom) / 2;
+  const X = px => vx + px * dispScale, Y = py => vy + py * dispScale;
+  ctx.clearRect(0, 0, c.width, c.height);
+  ctx.strokeStyle = 'rgba(70,196,122,.95)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 4]);
+  // Aussenkreis + Bull + Bull25
+  ctx.beginPath(); ctx.arc(X(cal.cx), Y(cal.cy), cal.r * dispScale, 0, Math.PI * 2); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.beginPath(); ctx.arc(X(cal.cx), Y(cal.cy), cal.r * dispScale * 0.094, 0, Math.PI * 2); ctx.stroke();
+  // 20 Sektorenlinien (20er oben)
+  ctx.strokeStyle = 'rgba(70,196,122,.45)';
+  for (let i = 0; i < 20; i++) {
+    const a = (i * 18 - 9) * Math.PI / 180;
+    ctx.beginPath();
+    ctx.moveTo(X(cal.cx), Y(cal.cy));
+    ctx.lineTo(X(cal.cx + Math.sin(a) * cal.r), Y(cal.cy - Math.cos(a) * cal.r));
+    ctx.stroke();
+  }
+  setTimeout(() => ctx.clearRect(0, 0, c.width, c.height), 4000);
 }
 
 function endEarly() {
