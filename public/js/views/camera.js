@@ -98,12 +98,12 @@ export function mountCam(host, onThrow, onStatus) {
     return;
   }
   host.dataset.camMounted = '1';
-  const frame = el('div', { style: 'height:clamp(300px,52vh,480px);aspect-ratio:9/16;width:auto;margin:0 auto;overflow:hidden;border-radius:14px;background:#000;position:relative' });
-  const v = el('video', { autoplay: '', playsinline: '', muted: '', style: 'width:100%;height:100%;object-fit:cover;display:block;transform-origin:center' });
+  const frame = el('div', { style: 'width:100%;height:clamp(280px,50vh,460px);overflow:hidden;border-radius:14px;background:#000;position:relative' });
+  const v = el('video', { autoplay: '', playsinline: '', muted: '', style: 'width:100%;height:100%;object-fit:contain;display:block;transform-origin:center' });
   // KAY: Start MAXIMAL weit draussen (0,4x), dann gezielt reinziehen
-  const zoomLabel = el('span', { class: 'small muted', style: 'float:right' }, '0,4x');
-  const zoom = el('input', { type: 'range', min: 40, max: 500, value: 40, step: 5, style: 'width:100%;margin:6px 0 0' });
-  v.style.transform = 'scale(0.4)';
+  const zoomLabel = el('span', { class: 'small muted', style: 'float:right' }, '0,35x');
+  const zoom = el('input', { type: 'range', min: 25, max: 500, value: 35, step: 5, style: 'width:100%;margin:6px 0 0' });
+  v.style.transform = 'scale(0.35)';
   zoom.oninput = () => { v.style.transform = `scale(${zoom.value / 100})`; zoomLabel.textContent = (zoom.value / 100).toFixed(1).replace('.', ',') + 'x'; };
   const note = el('div', { class: 'small muted', style: 'text-align:center;margin-top:2px;font-size:10.5px;line-height:1.25' }, 'Kamera startet…');
   frame.append(v);
@@ -114,8 +114,8 @@ export function mountCam(host, onThrow, onStatus) {
   v.onclick = async (ev) => {
     if (phase.m !== 'kalib') return;
     const r = v.getBoundingClientRect();
-    // object-fit: COVER -> sichtbarer Video-Ausschnitt innerhalb des Elements
-    const sc = Math.max(r.width / (v.videoWidth || r.width), r.height / (v.videoHeight || r.height));
+    // object-fit: CONTAIN -> sichtbarer Video-Bereich innerhalb des Elements
+    const sc = Math.min(r.width / (v.videoWidth || r.width), r.height / (v.videoHeight || r.height));
     const offX = (r.width - (v.videoWidth || r.width) * sc) / 2;
     const offY = (r.height - (v.videoHeight || r.height) * sc) / 2;
     const px = (ev.clientX - r.left - offX) / sc;
