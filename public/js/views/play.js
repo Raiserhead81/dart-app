@@ -16,7 +16,7 @@ import { turnHoldMs } from '/js/core/turnhold.js';
 import { padThrow, padSpecial, pushSnapshot, popSnapshot, checkoutLine, HAPTIC } from '/js/core/pad.js';
 import { activePlayer, store, rerender } from '/js/app.js';
 import { cricketMarksTable } from '/js/views/cricket-ui.js';
-import { mountCam, unmountCam, toggleAufnahme } from '/js/views/camera.js';
+import { mountCam, unmountCam, toggleAufnahme, tapEingabeAnbinden } from '/js/views/camera.js';
 
 const STARTS = [101, 170, 301, 501, 701, 1001];
 const restTickMemo = {}; // letzter Rest je Spieler — fuer den Score-Tick beim Wechsel
@@ -257,6 +257,13 @@ function renderX01Game(view) {
       setTimeout(() => korrektur.remove(), 3000);
       firePad(session, view, () => makeThrow(seg.k === 'outer' ? 'outer' : seg.k, seg.n));
     });
+    // KAY: TAP-AUF-DIE-SCHEIBE - Kamerabild ist das Eingabepad
+    setTimeout(() => {
+      const v = document.querySelector('#camhost video');
+      if (v) tapEingabeAnbinden(v, (seg) => {
+        firePad(session, view, () => makeThrow(seg.k === 'outer' ? 'outer' : seg.k, seg.n));
+      }, () => toast('Erst kalibrieren: TIPPE Bull-Mitte, dann untere Doppelkante'));
+    }, 900);
   }
   view.append(el('div', { id: 'bigevent' }), el('div', { id: 'boardoverlay' }));
 
