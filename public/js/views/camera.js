@@ -189,6 +189,37 @@ export function renderCamera(view) {
   const phase = { mode: 'idle' }; // idle | kalib-bull | kalib-rand
   const zoom = el('input', { type: 'range', min: 100, max: 300, value: 100, style: 'width:100%;display:none' });
   const startBtn = el('button', { class: 'btn primary wide mt' }, 'Kamera starten');
+  // KAY: AUFNAHME fuer die Engine-Kalibrierung (Agent analysiert das Video offline)
+  let recorder = null, chunks = [];
+  const recBtn = el('button', { class: 'btn danger wide mt', style: 'display:none' }, 'Aufnahme starten');
+  const recLink = el('a', { class: 'btn wide mt', style: 'display:none;text-decoration:none' }, 'Video herunterladen');
+  recBtn.onclick = () => {
+    if (!stream) return;
+    if (recorder && recorder.state === 'recording') {
+      recorder.stop();
+      recBtn.textContent = 'Aufnahme starten';
+      return;
+    }
+    chunks = [];
+    try {
+      recorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ? 'video/webm;codecs=vp9' : 'video/webm' });
+    } catch (e) { recorder = new MediaRecorder(stream); }
+    recorder.ondataavailable = (ev) => { if (ev.data && ev.data.size) chunks.push(ev.data); };
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: 'video/webm' });
+      window.__lastRecording = blob; // KAY-DIAGNOSE: Agent zieht das per CDP
+      const url = URL.createObjectURL(blob);
+      recLink.href = url;
+      recLink.download = 'dart-aufnahme.webm';
+      recLink.style.display = '';
+      recLink.textContent = `Video speichern (${(blob.size / 1e6).toFixed(1)} MB)`;
+      status.textContent = 'Aufnahme fertig - Agent kann sie jetzt analysieren';
+    };
+    recorder.start(500);
+    recBtn.textContent = 'Aufnahme STOPPEN (jetzt werfen!)';
+    status.textContent = 'AUFNAHME LÄUFT - wirf deine Darts';
+  };
+  startBtn.addEventListener('afterstart', () => {});
   // KAY/OPPO Find X: mehrere Linsen - Auswahl der Back-Kameras (Weitwinkel!)
   const lensRow = el('div', { class: 'row mt', style: 'gap:6px' });
   (async () => {
@@ -217,6 +248,7 @@ export function renderCamera(view) {
       status.textContent = 'Kalibrierung: Tippe auf das BULL-Zentrum';
       phase.mode = 'kalib-bull';
       startBtn.style.display = 'none';
+      recBtn.style.display = '';
     } else {
       status.textContent = 'Kamera-Freigabe verweigert oder keine Kamera';
     }
