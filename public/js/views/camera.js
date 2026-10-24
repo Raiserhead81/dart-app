@@ -209,6 +209,23 @@ export function mountCam(host, onThrow, onStatus) {
   })();
 }
 
+// KAY: TAP-AUF-DIE-SCHEIBE - das Kamerabild wird zum Eingabepad.
+// Tap auf den Treffer => Segment => onThrow. Robust, sofort, ohne Erkennungsrisiko.
+export function tapEingabeAnbinden(videoEl, onThrow, onKalibHinweis) {
+  videoEl.addEventListener('click', (ev) => {
+    if (!cal) { if (onKalibHinweis) onKalibHinweis(); return; }
+    const r = videoEl.getBoundingClientRect();
+    const sc = Math.min(r.width / (videoEl.videoWidth || r.width), r.height / (videoEl.videoHeight || r.height));
+    const offX = (r.width - (videoEl.videoWidth || r.width) * sc) / 2;
+    const offY = (r.height - (videoEl.videoHeight || r.height) * sc) / 2;
+    const zoom = videoEl.style.transform ? parseFloat(videoEl.style.transform.replace(/[^\d.]/g, '')) || 1 : 1;
+    const px = (ev.clientX - r.left - offX) / sc / zoom;
+    const py = (ev.clientY - r.top - offY) / sc / zoom;
+    const seg = segVonPixel(px, py, cal);
+    if (seg) onThrow(seg);
+  });
+}
+
 export function unmountCam() {
   stopAuto();
   stopCam();
