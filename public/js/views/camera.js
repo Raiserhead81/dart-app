@@ -214,15 +214,20 @@ export function mountCam(host, onThrow, onStatus) {
 export function tapEingabeAnbinden(videoEl, onThrow, onKalibHinweis) {
   videoEl.addEventListener('click', (ev) => {
     if (!cal) { if (onKalibHinweis) onKalibHinweis(); return; }
-    const r = videoEl.getBoundingClientRect();
-    const sc = Math.min(r.width / (videoEl.videoWidth || r.width), r.height / (videoEl.videoHeight || r.height));
-    const offX = (r.width - (videoEl.videoWidth || r.width) * sc) / 2;
-    const offY = (r.height - (videoEl.videoHeight || r.height) * sc) / 2;
-    const zoom = videoEl.style.transform ? parseFloat(videoEl.style.transform.replace(/[^\d.]/g, '')) || 1 : 1;
-    const px = (ev.clientX - r.left - offX) / sc / zoom;
-    const py = (ev.clientY - r.top - offY) / sc / zoom;
+    // Zoom-sichere Umrechnung: offsetWidth = UNVERAENDERTE Elementgroesse,
+    // getBoundingClientRect = skaliert. Tap erst entzoomen, dann contain-mappen.
+    const ow = videoEl.offsetWidth || videoEl.videoWidth, oh = videoEl.offsetHeight || videoEl.videoHeight;
+    const rect = videoEl.getBoundingClientRect();
+    const zoom = videoEl.style.transform ? (parseFloat(videoEl.style.transform.replace(/[^\d.]/g, '')) || 1) : 1;
+    const lx = (ev.clientX - rect.left) / zoom;
+    const ly = (ev.clientY - rect.top) / zoom;
+    const sc = Math.min(ow / (videoEl.videoWidth || ow), oh / (videoEl.videoHeight || oh));
+    const offX = (ow - (videoEl.videoWidth || ow) * sc) / 2;
+    const offY = (oh - (videoEl.videoHeight || oh) * sc) / 2;
+    const px = (lx - offX) / sc;
+    const py = (ly - offY) / sc;
     const seg = segVonPixel(px, py, cal);
-    if (seg) onThrow(seg);
+    if (seg) onThrow(seg); else if (onKalibHinweis) onKalibHinweis();
   });
 }
 
