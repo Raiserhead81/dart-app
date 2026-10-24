@@ -100,11 +100,13 @@ export function mountCam(host, onThrow, onStatus) {
   host.dataset.camMounted = '1';
   const frame = el('div', { style: 'height:clamp(300px,52vh,480px);aspect-ratio:9/16;width:auto;margin:0 auto;overflow:hidden;border-radius:14px;background:#000;position:relative' });
   const v = el('video', { autoplay: '', playsinline: '', muted: '', style: 'width:100%;height:100%;object-fit:cover;display:block;transform-origin:center' });
-  const zoom = el('input', { type: 'range', min: 100, max: 300, value: 100, style: 'width:100%;margin:6px 0 0' });
-  zoom.oninput = () => { v.style.transform = `scale(${zoom.value / 100})`; };
+  const zoomLabel = el('span', { class: 'small muted', style: 'float:right' }, '1,0x');
+  const zoom = el('input', { type: 'range', min: 100, max: 500, value: 100, step: 5, style: 'width:100%;margin:6px 0 0' });
+  zoom.oninput = () => { v.style.transform = `scale(${zoom.value / 100})`; zoomLabel.textContent = (zoom.value / 100).toFixed(1).replace('.', ',') + 'x'; };
   const note = el('div', { class: 'small muted', style: 'text-align:center;margin-top:2px;font-size:10.5px;line-height:1.25' }, 'Kamera startet…');
   frame.append(v);
-  host.append(frame, zoom, note);
+  const zoomRow = el('div', {}, zoomLabel);
+  host.append(frame, zoomRow, zoom, note);
   video = v; // Modul-Referenz fuer frameGrab/startAuto
   const phase = { m: 'idle' };
   v.onclick = async (ev) => {
