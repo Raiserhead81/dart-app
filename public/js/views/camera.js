@@ -411,7 +411,7 @@ function analyseBoardInFrame(img) {
   }
   if (n < 40) return null;
   let cx = sx / n, cy = sy / n;
-  // 2 Runden Verfeinerung: Ausreisser raus, neu mitteln, Radius aus 97%-Quantil
+  // 2 Runden Verfeinerung: Ausreisser raus, neu mitteln
   for (let runde = 0; runde < 2; runde++) {
     const dists = punkte.map(p => Math.hypot(p[0] - cx, p[1] - cy));
     dists.sort((a, b) => a - b);
@@ -421,10 +421,36 @@ function analyseBoardInFrame(img) {
     cy = innen.reduce((a, p) => a + p[1], 0) / innen.length;
     punkte.sort((a, b) => Math.hypot(a[0] - cx, a[1] - cy) - Math.hypot(b[0] - cx, b[1] - cy));
   }
-  const dists2 = punkte.map(p => Math.hypot(p[0] - cx, p[1] - cy)).sort((a, b) => a - b);
-  let r = dists2[Math.floor(dists2.length * 0.97)];
-  // Double-Aussenkante = aeusserste R/G-Pixel => r ist bereits der Board-Radius
-  return { cx, cy, r, n: punkte.length };
+  // PIXELGENAU Stufe 1: BULL-Zentrum = gewichteter Schwerpunkt des dunkelsten Kerns
+  let bsum = 0, bx = 0, by = 0;
+  const rEst0 = punkte.length ? Math.hypot(punkte[punkte.length - 1][0] - cx, punkte[punkte.length - 1][1] - cy) : 0;
+  const fenster = Math.max(4, rEst0 * 0.22);
+  for (let y = Math.max(0, cy - fenster) | 0; y < Math.min(H, cy + fenster); y++) {
+    for (let x = Math.max(0, cx - fenster) | 0; x < Math.min(W, cx + fenster); x++) {
+      const i = (y * W + x) * 4;
+      const grau = (D[i] + D[i + 1] + D[i + 2]) / 3;
+      if (grau < 80) { const w = (80 - grau) * (80 - grau); bsum += w; bx += x * w; by += y * w; }
+    }
+  }
+  if (bsum > 30) { cx = bx / bsum; cy = by / bsum; }
+  // PIXELGENAU Stufe 2: Radius = Mittel der aeussersten R/G-Pixel je Strahl (24 Winkel)
+  const strahlen = 24, rand = [];
+  for (let a = 0; a < strahlen; a++) {
+    const rad = a / strahlen * 2 * Math.PI;
+    let letzte = 0;
+    for (let rr = rEst0 * 1.05; rr > rEst0 * 0.3; rr -= 1) {
+      const x = Math.round(cx + Math.cos(rad) * rr), y = Math.round(cy + Math.sin(rad) * rr);
+      if (x < 0 || y < 0 || x >= W || y >= H) continue;
+      const i = (y * W + x) * 4;
+      const r2 = D[i], g2 = D[i + 1], b2 = D[i + 2];
+      if ((r2 > 70 && r2 > g2 + 28 && r2 > b2 + 28) || (g2 > 45 && g2 > r2 + 16 && g2 > b2 + 6)) { letzte = rr; break; }
+    }
+    if (letzte > 0) rand.push(letzte);
+  }
+  rand.sort((a, b) => a - b);
+  // Median der Strahl-Rander (robust gegen einzelne verdeckte Winkel)
+  let r = rand.length >= 12 ? rand[Math.floor(rand.length / 2)] : (punkte.length ? Math.hypot(punkte[punkte.length - 1][0] - cx, punkte[punkte.length - 1][1] - cy) : 0);
+  return { cx, cy, r, n: punkte.length, strahlen: rand.length };
 }
 
 export function autoKalibriere(videoEl) {
