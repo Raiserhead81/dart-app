@@ -98,7 +98,7 @@ export function mountCam(host, onThrow, onStatus) {
     return;
   }
   host.dataset.camMounted = '1';
-  const frame = el('div', { style: 'width:100%;height:clamp(260px,54vh,470px);overflow:hidden;border-radius:14px;background:#000;position:relative' });
+  const frame = el('div', { style: 'height:clamp(300px,52vh,480px);aspect-ratio:9/16;width:auto;margin:0 auto;overflow:hidden;border-radius:14px;background:#000;position:relative' });
   const v = el('video', { autoplay: '', playsinline: '', muted: '', style: 'width:100%;height:100%;object-fit:cover;display:block;transform-origin:center' });
   const zoom = el('input', { type: 'range', min: 100, max: 300, value: 100, style: 'width:100%;margin:6px 0 0' });
   zoom.oninput = () => { v.style.transform = `scale(${zoom.value / 100})`; };
