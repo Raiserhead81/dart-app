@@ -112,6 +112,14 @@ def update_manifest(out, set_name, label, voice, lang, full):
         "langs": [lang],
         "full": bool(full),
     }
+    # BUGFIX: bestehenden Eintrag mergen statt ersetzen — sonst zerstoert ein
+    # Gemini-Nachtrag label/provider/complete von ElevenLabs/edge-Sets (24.10.2026).
+    existing = next((s for s in manifest["sets"] if s["id"] == set_name), None)
+    if existing:
+        for k, v in existing.items():
+            if k != "langs":
+                entry[k] = v
+        entry["langs"] = sorted(set(existing.get("langs", [])) | {lang})
     manifest["sets"] = [s for s in manifest["sets"] if s["id"] != set_name] + [entry]
     manifest["sets"].sort(key=lambda s: (s["id"] != set_name, s.get("provider") != "elevenlabs", s["id"]))
     json.dump(manifest, open(mp, "w"), ensure_ascii=False, indent=1)

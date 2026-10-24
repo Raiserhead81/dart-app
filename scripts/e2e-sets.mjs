@@ -10,11 +10,35 @@ mkdirSync(OUT, { recursive: true });
 const BASE = process.argv[2] || process.env.BASE || 'https://dart.gemivo.de';
 
 const browser = await chromium.launch({ channel: 'chrome', args: ['--mute-audio'] });
-const page = await (await browser.newContext()).newPage();
+const ctx = await browser.newContext();
+// Fullscreen-Stub (Playwright kann echtes FS nicht): zaehlt requestFullscreen-Aufrufe
+await ctx.addInitScript(() => {
+  window.__fsCalls = 0;
+  Element.prototype.requestFullscreen = function () { window.__fsCalls++; return Promise.resolve(); };
+});
+const page = await ctx.newPage();
 
 await page.goto(BASE + '/#/play', { waitUntil: 'domcontentloaded' });
 const version = (await page.request.get(BASE + '/VERSION').then(r => r.text())).trim();
 console.log('VERSION:', version);
+
+// --- Stim-Migration: unvollstaendiges Set (complete:false) -> automatisch brian ---
+const mig = await page.evaluate(async () => {
+  const m = await import('/js/caller-voice.js');
+  await m.loadCallerManifest();
+  m.configureCaller({ voiceSet: 'gemma' }); // simuliert Kays gespeicherten Fehlerstand
+  await m.loadCallerManifest();
+  return {
+    after: m.callerSettings().voiceSet,
+    gemmaComplete: m.isVoiceSetComplete('gemma'),
+    brianComplete: m.isVoiceSetComplete('elevenlabs-brian')
+  };
+});
+console.log('MIGRATION:', JSON.stringify(mig));
+if (mig.gemmaComplete !== false || mig.brianComplete !== true || mig.after !== 'elevenlabs-brian') {
+  console.log('FEHLER: Stim-Migration greift nicht');
+  process.exit(1);
+}
 
 // --- Setup: Sets Best of 3 + First to 1 (Legs pro Set) ---
 await page.fill('input[data-pi]', 'Kay');
@@ -24,6 +48,9 @@ await page.getByRole('button', { name: 'First to 1' }).click();
 await page.getByRole('button', { name: 'Spiel starten' }).click();
 await page.waitForSelector('.padkey', { timeout: 10000 });
 console.log('Spiel gestartet (Best of 3 Sets, First to 1)');
+const fsCalls = await page.evaluate(() => window.__fsCalls || 0);
+console.log('requestFullscreen-Aufrufe nach Spielstart:', fsCalls);
+if (fsCalls < 1) { console.log('FEHLER: kein Auto-Fullscreen beim Spielstart'); process.exit(1); }
 const glabel = await page.textContent('.glabel');
 console.log('gtop:', glabel.trim());
 if (!new RegExp(`Best of ${BEST_OF} Sets`).test(glabel)) { console.log('FEHLER: Sets nicht im gtop'); process.exit(1); }

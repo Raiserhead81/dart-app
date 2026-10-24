@@ -62,7 +62,9 @@ self.addEventListener('fetch', (e) => {
   if (CACHE_FIRST.some(re => re.test(url.pathname))) {
     e.respondWith((async () => {
       const c = await caches.open(ASSETS);
-      const hit = await c.match(e.request);
+      // KAY: Clip-Vorabladen landet im eigenen Cache — der wird zuerst befragt
+      const clipHit = await caches.open('dartpro-clips-v1').then(cc => cc.match(e.request)).catch(() => null);
+      const hit = clipHit || await c.match(e.request);
       const net = fetch(e.request).then(res => {
         if (res.ok) c.put(e.request, res.clone());
         return res;
