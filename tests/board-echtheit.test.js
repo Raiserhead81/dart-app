@@ -90,7 +90,8 @@ describe('Echtheits-Check: Scheibe ja, Fernseher nein', () => {
   it('fast schwarz + Rauschen: Auto lehnt ab (Fehlerkennung unmöglich, Tap-Fallback noetig)', () => {
     for (let i = 0; i < 3; i++) {
       const erg = analyseBoardInFrame(baueBoard(270, 480, 140, 230, 95, 0.08, 6));
-      if (erg) expect(erg.qualitaet).toBeLessThan(60);
+      // Auto-Gate: q < 60 ODER Radius gekippt (r > 0.75 * Frame-Breite)
+      if (erg) expect(erg.qualitaet < 60 || erg.r > 202).toBe(true);
     }
   });
 

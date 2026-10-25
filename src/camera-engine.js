@@ -201,6 +201,61 @@ export function analyseBoardInFrame(img) {
   }
   const r = ellipse ? Math.max(ellipse.rx, ellipse.ry) : rEst0;
   if (ellipse) { cx = ellipse.cx; cy = ellipse.cy; }
+  // v6: Bild des echten Kreismittelpunkts M' = Zentroid des GRUENEN 25er-Rings
+  // (gruener Ring ums Bull; einziger gruen-privater Bereich unter 0.45*r, Triple-
+  // Band beginnt erst bei 0.527*r). Bei Schraegsicht liegt M' bis ~0.4*r vom
+  // Ellipsenzentrum entfernt - dunkle Zentroid-Fenster scheitern daran (Singles!).
+  let bullM = null;
+  {
+    // Grobrichtung: Zentroid aller gruenen Pixel im Ellipsen-Inneren (Tilt-Richtung)
+    // Feinsuche: 1D-Scan in dieser Richtung - der 25er-Ring ist der EINZIGE gruene
+    // Cluster mit gruen-freier Umgebung ( zwischen 0.094r und 0.527r liegt kein Gruen,
+    // Triple-Cluster hat dagegen immer weiteres Gruen daneben).
+    const ctG = Math.cos(ellipse ? ellipse.theta : 0), stG = Math.sin(ellipse ? ellipse.theta : 0);
+    const RXg = ellipse ? ellipse.rx : r, RYg = ellipse ? ellipse.ry : r;
+    let gs = 0, gxs = 0, gys = 0;
+    const gruenPx = [];
+    const fwG = r * 0.62;
+    for (let y = Math.max(0, cy - fwG) | 0; y <= Math.min(H - 1, cy + fwG); y++) {
+      for (let x = Math.max(0, cx - fwG) | 0; x <= Math.min(W - 1, cx + fwG); x++) {
+        const dx = x - cx, dy = y - cy;
+        const u = (dx * ctG + dy * stG) / RXg, v = (-dx * stG + dy * ctG) / RYg;
+        if (u * u + v * v > 0.48 * 0.48) continue;
+        const i = (y * W + x) * 4;
+        if (istGruenPx(D[i], D[i + 1], D[i + 2])) {
+          gruenPx.push([x, y]); gxs += x; gys += y; gs++;
+        }
+      }
+    }
+    if (gs > 5) {
+      const istGr = (x, y) => {
+        if (x < 0 || y < 0 || x >= W || y >= H) return false;
+        const i = (y * W + x) * 4;
+        return istGruenPx(D[i], D[i + 1], D[i + 2]);
+      };
+      let bestScore = -1e9, bestXY = null;
+      const rKern = Math.max(2, r * 0.11), rFrei = r * 0.30;
+      // 16 Richtungen scannen: das Gruen-Zentroid zeigt bei Schraegsicht zur
+      // Triple-Masse, NICHT zum Bull - Richtung ist unzuverlaessig
+      for (let ri = 0; ri < 16; ri++) {
+        const dxr = Math.cos(ri * Math.PI / 8), dyr = Math.sin(ri * Math.PI / 8);
+        for (let t = 0; t <= r * 0.45; t += 1) {
+          const zx = cx + dxr * t, zy = cy + dyr * t;
+          let drin = 0, frei = 0;
+          for (const [px, py] of gruenPx) {
+            const dd = Math.hypot(px - zx, py - zy);
+            if (dd <= rKern) drin++;
+            else if (dd <= rFrei) frei++;
+          }
+          const score = drin - 2 * frei;
+          if (score > bestScore) { bestScore = score; bestXY = [zx, zy]; }
+        }
+      }
+      if (bestXY && bestScore > 3) bullM = bestXY;
+    }
+  }
+  // v6: projektive Homographie aus Ellipse + Bull-Versatz (echte Schraegsicht-Korrektur)
+  const h = ellipse && bullM ? baueHomographie(ellipse.cx, ellipse.cy, ellipse.rx, ellipse.ry, ellipse.theta, bullM[0], bullM[1]) : null;
   // ROTATION per PHASEN-KORRELATION: Signal = Schwarz(+1)/Weiss(-1) entlang des
   // Single-Rings; ideal = 20er schwarz zentriert oben, alle 36 Grad. Der Versatz
   // mit der hoechsten Korrelation = Kamera-Drehung. Robust: nutzt alle 20 Sektoren.
@@ -213,11 +268,12 @@ export function analyseBoardInFrame(img) {
     const rad = (t - 90) * Math.PI / 180; // 0 = oben
     for (const f of [0.72, 0.80, 0.87]) {
       const nx = Math.cos(rad) * f, ny = Math.sin(rad) * f;
-      const x = Math.round(cx + (nx * RX * Math.cos(TH) - ny * RY * Math.sin(TH)));
-      const y = Math.round(cy + (nx * RX * Math.sin(TH) + ny * RY * Math.cos(TH)));
+      // v6: projektiv mappen (Homographie falls vorhanden, sonst affine Ellipse)
+      const p = normierraumZuBild(nx, ny, { cx, cy, rx: RX, ry: RY, theta: TH, h });
+      const x = Math.round(p.x), y = Math.round(p.y);
       if (x < 0 || y < 0 || x >= W || y >= H) continue;
       const i = (y * W + x) * 4;
-      const [h, sv, vv] = rgb2hsv(D[i] * 255 / maxR, D[i + 1] * 255 / maxG, D[i + 2] * 255 / maxB);
+      const [hsv, sv, vv] = rgb2hsv(D[i] * 255 / maxR, D[i + 1] * 255 / maxG, D[i + 2] * 255 / maxB);
       if (sv < 0.25 && vv < 0.35) { signal[t] += 1; signCount[t]++; }
       else if (sv < 0.25 && vv > 0.55) { signal[t] -= 1; signCount[t]++; }
     }
@@ -238,7 +294,7 @@ export function analyseBoardInFrame(img) {
   // ===== ECHTHEITS-CHECK: Dartscheibe oder Fremdbild (TV/Foto/Wand)? =====
   // Echte Scheibe: Farben NUR in Triple-Band (0.45-0.68) + Double-Band (0.88-1.05),
   // 20-fache rot/gruen-Alternanz, dunkle Board-Umrandung ausserhalb, Balance ~50/50.
-  const ncal = { cx, cy, rx: ellipse ? ellipse.rx : r, ry: ellipse ? ellipse.ry : r, theta: ellipse ? ellipse.theta : 0 };
+  const ncal = { cx, cy, rx: ellipse ? ellipse.rx : r, ry: ellipse ? ellipse.ry : r, theta: ellipse ? ellipse.theta : 0, h };
   let inBand = 0;
   for (const p of punkte) {
     const q = inNormierraum(p[0], p[1], ncal);
@@ -252,8 +308,9 @@ export function analyseBoardInFrame(img) {
     const rad2 = (t - 90) * Math.PI / 180;
     for (const f of [0.58, 0.96]) {
       const nx = Math.cos(rad2) * f, ny = Math.sin(rad2) * f;
-      const x = Math.round(cx + (nx * NX * Math.cos(NTH) - ny * NY * Math.sin(NTH)));
-      const y = Math.round(cy + (nx * NX * Math.sin(NTH) + ny * NY * Math.cos(NTH)));
+      // v6: projektives Sampling - affin wuerde bei Schraegsicht Winkel-Bins verschieben
+      const bp = normierraumZuBild(nx, ny, ncal);
+      const x = Math.round(bp.x), y = Math.round(bp.y);
       if (x < 1 || y < 1 || x >= W - 1 || y >= H - 1) continue;
       const i = (y * W + x) * 4;
       if (istRotPx(D[i], D[i + 1], D[i + 2])) binRot[Math.round(t / 18) % 20]++;
@@ -290,7 +347,8 @@ export function analyseBoardInFrame(img) {
   let qualitaet = Math.min(1, ringAnteil / 0.75) * 40 + alternanz * 30 + randDunkel * 15 + Math.min(1, balance / 0.42) * 15;
   // K.O.: weder Ringstruktur noch Sektorwechsel => kein Board, egal wie der Rest aussieht
   if ((ringAnteil < 0.5 && alternanz < 0.65) || randDunkel < 0.08) qualitaet = Math.min(qualitaet, 45);
-  return { cx, cy, r, rx: ellipse ? ellipse.rx : r, ry: ellipse ? ellipse.ry : r, theta: ellipse ? ellipse.theta : 0, aspekt: ellipse ? ellipse.aspekt : 1, rot, n, strahlen: rand.length, qualitaet: Math.round(qualitaet), ringAnteil: +ringAnteil.toFixed(2), alternanz, randDunkel: +randDunkel.toFixed(2), balance: +balance.toFixed(2) };
+  // v6: projektive Homographie aus Ellipse + Bull-Versatz (echte Schraegsicht-Korrektur)
+  return { cx, cy, r, rx: ellipse ? ellipse.rx : r, ry: ellipse ? ellipse.ry : r, theta: ellipse ? ellipse.theta : 0, aspekt: ellipse ? ellipse.aspekt : 1, rot, n, strahlen: rand.length, qualitaet: Math.round(qualitaet), ringAnteil: +ringAnteil.toFixed(2), alternanz, randDunkel: +randDunkel.toFixed(2), balance: +balance.toFixed(2), h };
 }
 
 
@@ -351,9 +409,70 @@ export function fitEllipse(punkte) {
   return { cx: mx, cy: my, rx, ry, theta, aspekt: Math.min(rx, ry) / Math.max(rx, ry) };
 }
 
+// ---------- PROJEKTIVE KORREKTUR (Homographie) ----------
+// Eine schraeg gefilmte Scheibe projiziert sich als Homographie (nicht affin):
+// Der Kreismittelpunkt (Bull) bildet sich NICHT aufs Ellipsenzentrum ab. Diese
+// Verschiebung liefert den fehlenden Parameter - ganz ohne Kamera-Intrinsics.
+// H bildet Normierraum (Einheitskreis) -> Bild ab: H = S * B(psi,phi),
+// S = T*R(theta)*diag(rx,ry,1) (affin), B = Lorentz-"Boost", der den Kreis invariant laesst.
+// Bild des Mittelpunkts: C + R(theta)*(rx*tanh(psi)*cos(phi), ry*tanh(psi)*sin(phi)).
+function m3mul(A, B) {
+  const R = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+  for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+    let s = 0; for (let k = 0; k < 3; k++) s += A[i][k] * B[k][j]; R[i][j] = s;
+  }
+  return R;
+}
+
+export function baueHomographie(cx, cy, rx, ry, theta, mx, my) {
+  if (!rx || !ry || !isFinite(mx) || !isFinite(my)) return null;
+  const ct = Math.cos(-theta), st = Math.sin(-theta);
+  const dx = mx - cx, dy = my - cy;
+  const u = (dx * ct - dy * st) / rx, v = (dx * st + dy * ct) / ry;
+  const tp = Math.hypot(u, v); // = tanh(psi)
+  if (tp >= 0.6) return null; // Bull-Messung unplausibel (zu weit weg) -> frontal bleiben
+  if (tp < 0.03) return null; // frontal: affine Ellipse reicht, h unnoetig
+  const phi = Math.atan2(v, u);
+  const chh = Math.sqrt(1 - tp * tp), sinh = tp / chh, cosh = 1 / chh;
+  const cp = Math.cos(phi), sp = Math.sin(phi);
+  const B = m3mul(m3mul([[cp, -sp, 0], [sp, cp, 0], [0, 0, 1]], [[cosh, 0, sinh], [0, 1, 0], [sinh, 0, cosh]]), [[cp, sp, 0], [-sp, cp, 0], [0, 0, 1]]);
+  const ct2 = Math.cos(theta), st2 = Math.sin(theta);
+  const S = [[rx * ct2, -ry * st2, cx], [rx * st2, ry * ct2, cy], [0, 0, 1]];
+  return m3mul(S, B);
+}
+
+// Normierraum -> Bild (Video-Pixel). Ohne h: affine Rueckabbildung.
+export function normierraumZuBild(u, v, c) {
+  if (c && c.h) {
+    const H = c.h;
+    const X = H[0][0] * u + H[0][1] * v + H[0][2];
+    const Y = H[1][0] * u + H[1][1] * v + H[1][2];
+    const Z = H[2][0] * u + H[2][1] * v + H[2][2];
+    if (Math.abs(Z) > 1e-9) return { x: X / Z, y: Y / Z };
+  }
+  const rx = c.rx || c.r || 1, ry = c.ry || c.r || 1, th = c.theta || 0;
+  const ct = Math.cos(th), st = Math.sin(th);
+  return { x: c.cx + u * rx * ct - v * ry * st, y: c.cy + u * rx * st + v * ry * ct };
+}
+
 // Bildpunkt -> Normierraum (Einheitskreis der Scheibe).
-// Nutzt cal.rx/ry/theta (Ellipse) oder faellt auf Kreis (rx=r) zurueck.
+// v6: mit cal.h echte Homographie (projektiv), sonst affine Ellipse wie zuvor.
 export function inNormierraum(x, y, c) {
+  if (c && c.h) {
+    const H = c.h;
+    // loese H*(u,v,1) ∝ (x,y,1): 2x2-System nach Umstellen ( projektive Terme! )
+    const a = H[0][0], b = H[0][1], c0 = H[0][2];
+    const d = H[1][0], e = H[1][1], f0 = H[1][2];
+    const g = H[2][0], h2 = H[2][1], i0 = H[2][2];
+    const a2 = a - x * g, b2 = b - x * h2, r2 = x * i0 - c0;
+    const d2 = d - y * g, e2 = e - y * h2, s2 = y * i0 - f0;
+    const det = a2 * e2 - b2 * d2;
+    if (Math.abs(det) > 1e-12) {
+      const u = (r2 * e2 - b2 * s2) / det;
+      const v = (-r2 * d2 + a2 * s2) / det;
+      return { u, v };
+    }
+  }
   const rx = c.rx || c.r || 1, ry = c.ry || c.r || 1;
   const th = c.theta || 0;
   const dx = x - c.cx, dy = y - c.cy;

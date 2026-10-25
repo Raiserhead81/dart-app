@@ -1,5 +1,14 @@
 # NOTIZEN dart-app
 
+## 2026-10-25 Homographie-Engine v6 (echte Schrägsicht-Korrektur)
+- UMBAU: Ellipsen-Näherung → echte PROJEKTIVE Korrektur (Homographie) ohne Kamera-Intrinsics. Versatz Bull-Zentrum M′ vs. Ellipsenzentrum liefert den fehlenden Projektionsparameter. Neu in src/camera-engine.js: m3mul, baueHomographie (Guards: tp>=0.6 unplausibel→affin, tp<0.03 frontal→affin), normierraumZuBild, inNormierraum (Cramer-Inversion, det-Gate 1e-12).
+- BULL-ERKENNUNG v6.2 (nach 2 Fehlversuchen): M′ = 16-Richtungs-Scan um Ellipsenzentrum, Score = grüne Pixel im 0.11r-Kern − 2×grüne im 0.30r-Ring. Grün-Zentroid-Richtung versagt (zeigt zur Triple-Masse!), affiner Normierraum-Radius-Filter auch (Triple wirkt bei Schrägsicht affin klein). Der 25er-Ring ist der EINZIGE grüne Cluster mit grün-freier Umgebung (0.094..0.527 kein Grün).
+- ALLE Sampling-Stellen projektiv: rot-Phasenkorrelation, alternanz-bins (binRot/binGruen), Echtheits-ringAnteil via inNormierraum mit h. ncal um h erweitert; zeichneRaster malt Rand als 72-Segment-Polygon projektiv (affiner Fallback ctx.arc).
+- autoKalibriere (camera.js): medAng() zirkularer Median für rot, h-Median über ≥2 Frames, resolve jetzt mit rx/ry/theta/rot/h/qualitaet (vorher verworfen).
+- TDZ-FALLE: Destrukturierung [h,sv,vv]=rgb2hsv() shadowte früheres h im selben Block → TDZ-ReferenceError, node --check findet das NICHT. Umbenannt zu [hsv,sv,vv].
+- E2E (scripts/e2e-homographie.mjs, perspektivisch geneigtes Mock-Board psi=0.22/phi=0.60): 6/6 GRÜN - q=91, cal.h 3×3, rx=353/ry=278/theta=0.122, rot=1°, Bull-Punkt err 15.5px, T20-Mitte→T20 projektiv (affin wäre OK gewesen, projektiv jetzt auch bei stärkerer Schrägsicht korrekt).
+- Suite 24 Dateien / 184 Tests grün. Deploy 1.0.1792932780.
+
 ## 2026-10-25 Zoom-Fix (WebView) + Echtheits-Gate (Auto-Kalibrierung)
 - ZOOM-BUG (Kay: "Zoom-Regler nach links -> verschwindet ploetzlich"): Ursache ist Android-WebView - <video> wird als eigene Surface gerendert, transform:scale(<1) kippt das Compositing, Bild verschwindet schlagartig. Desktop-Chrome/Headless-Playwright zeigt das NICHT (dort nur kontinuierliches Schrumpfen).
 - FIX: Zoom <= 1x jetzt per LAYOUT (width:% + margin:auto, zentriert), transform nur noch fuer Zoom > 1x. Gemeinsame Helfer in camera.js: setzeAnsichtsZoom(v,z) / leseAnsichtsZoom(v). Umgestellt: profile.js-Slider, camera.js mountCam-Slider (Standard 0,5x), Kamera-Assistent, alle Klick-Mappings (Tap-Kalibrierung, manuelle Kalibrierung, zeichneRaster, play.js-Overlay) nutzen leseAnsichtsZoom (bei Layout-Zoom = 1, contain-Mapping stimmt automatisch).

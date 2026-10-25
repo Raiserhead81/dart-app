@@ -6,7 +6,7 @@
 import { el } from '/js/util.js';
 import { store } from '/js/app.js';
 
-import { segVonPixel as _segVonPixel, findeNeuenPfeil as _finde, setEngineCal, analyseBoardInFrame, tapZuVideoPixel as _tapZuVideoPixel } from '/js/core/camera-engine.js';
+import { segVonPixel as _segVonPixel, findeNeuenPfeil as _finde, setEngineCal, analyseBoardInFrame, normierraumZuBild as _nrZuBild, tapZuVideoPixel as _tapZuVideoPixel } from '/js/core/camera-engine.js';
 
 let stream = null, video = null, canvas = null, ctx = null;
 let recorder = null, recChunks = [], recOnStop = null;
@@ -518,8 +518,34 @@ export function autoKalibriere(videoEl, onProgress) {
     if (ergs.length < 3) { resolve(null); return; }
     const qs = ergs.map(e => e.qualitaet || 0);
     const med = (arr, key) => { const v = arr.map(e => e[key]).sort((a, b) => a - b); return v[Math.floor(v.length / 2)]; };
+    // zirkulaerer Median fuer den Rotationswinkel (0..360, kein Umbruch bei 359->1)
+    const medAng = () => {
+      const v = ergs.map(e => e.rot || 0);
+      let best = v[0], bestS = -1;
+      for (const cand of v) {
+        let sx = 0, sy = 0;
+        for (const w of v) { const d = (w - cand) * Math.PI / 180; sx += Math.cos(d); sy += Math.sin(d); }
+        const s = Math.hypot(sx, sy);
+        if (s > bestS) { bestS = s; best = cand; }
+      }
+      return best;
+    };
     const skal = videoEl.videoWidth / 270;
-    resolve({ cx: med(ergs, 'cx') * skal, cy: med(ergs, 'cy') * skal, r: med(ergs, 'r') * skal, qualitaet: qs.sort((a, b) => a - b)[Math.floor(qs.length / 2)] });
+    // Homographie: nur wenn mindestens 2 Frames eine liefern; Median je Matrixeintrag, dann auf Video-Pixel skalieren
+    const hs = ergs.map(e => e.h).filter(Boolean);
+    let h = null;
+    if (hs.length >= 2) {
+      h = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+      for (let i = 0; i < 3; i++) for (let j = 0; j < 3; j++) {
+        const w = hs.map(m => m[i][j]).sort((a, b) => a - b);
+        h[i][j] = w[Math.floor(w.length / 2)] * (i < 2 ? skal : 1);
+      }
+    }
+    resolve({
+      cx: med(ergs, 'cx') * skal, cy: med(ergs, 'cy') * skal, r: med(ergs, 'r') * skal,
+      rx: med(ergs, 'rx') * skal, ry: med(ergs, 'ry') * skal, theta: med(ergs, 'theta'),
+      rot: medAng(), h, qualitaet: qs.sort((a, b) => a - b)[Math.floor(qs.length / 2)]
+    });
   });
 }
 
@@ -536,13 +562,27 @@ function zeichneRaster(videoEl, calErg) {
   const vx = (box.width - videoEl.videoWidth * sc) / 2, vy = (box.height - videoEl.videoHeight * sc) / 2;
   ctx.clearRect(0, 0, c.width, c.height);
   ctx.strokeStyle = 'rgba(70,196,122,.95)'; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.arc(vx + calErg.cx * sc, vy + calErg.cy * sc, calErg.r * sc, 0, Math.PI * 2); ctx.stroke();
+  const rot = calErg.rot || 0;
+  const zuScreen = (u, v) => { const p = _nrZuBild(u, v, calErg); return [vx + p.x * sc, vy + p.y * sc]; };
+  if (calErg.h) {
+    // projektiv: Kreise werden zu Kurven -> Polygon; Speichen bleiben Geraden
+    ctx.beginPath();
+    for (let k = 0; k <= 72; k++) {
+      const a = k / 72 * 2 * Math.PI;
+      const [sx, sy] = zuScreen(Math.sin(a), -Math.cos(a));
+      if (k === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+    }
+    ctx.closePath(); ctx.stroke();
+  } else {
+    ctx.beginPath(); ctx.arc(vx + calErg.cx * sc, vy + calErg.cy * sc, calErg.r * sc, 0, Math.PI * 2); ctx.stroke();
+  }
   ctx.strokeStyle = 'rgba(70,196,122,.5)';
   for (let i = 0; i < 20; i++) {
-    const a = (i * 18 - 9) * Math.PI / 180;
+    const a = (i * 18 - 9 + rot) * Math.PI / 180;
+    const ex = calErg.h ? zuScreen(Math.sin(a), -Math.cos(a)) : [vx + (calErg.cx + Math.sin(a) * calErg.r) * sc, vy + (calErg.cy - Math.cos(a) * calErg.r) * sc];
     ctx.beginPath();
     ctx.moveTo(vx + calErg.cx * sc, vy + calErg.cy * sc);
-    ctx.lineTo(vx + (calErg.cx + Math.sin(a) * calErg.r) * sc, vy + (calErg.cy - Math.cos(a) * calErg.r) * sc);
+    ctx.lineTo(ex[0], ex[1]);
     ctx.stroke();
   }
 }
