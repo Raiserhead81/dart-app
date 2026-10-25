@@ -505,3 +505,64 @@ export function inNormierraum(x, y, c) {
   const uy = (dx * st + dy * ct) / ry;
   return { u: ux, v: uy };
 }
+
+// KAY: LERNEN AUS KORREKTUR - Kay sagt, was WIRKLICH getroffen wurde (Tipp auf die
+// echte Pfeilposition), die Engine fuehrt die Kalibrierung daempfig nach:
+// - Winkel: gemessener Winkel der Pfeilspitze vs. Soll-Sektormitte -> rot nachfuehren (50 %)
+// - Radius: gemessener Radius vs. Soll-Ringmitte -> rx/ry skalieren (35 %)
+// Nur kleine Korrekturen werden gelernt (|dRot| <= 14°, Faktor 0.8-1.25) - bei groben
+// Abweichungen war es ein Fehltipp oder eine total verstellte Kamera: nur zaehlen, nicht lernen.
+export function lerneAusKorrektur(px, py, kind, nummer, c) {
+  const cal = c || _cal;
+  if (!cal || !cal.r || cal.r < 8) return null;
+  const n = inNormierraum(px, py, cal);
+  const istR = Math.hypot(n.u, n.v);
+  if (istR < 1e-6) return null;
+  // Soll-Radius je Ring (Ringmitten; single = Weitbereich-Mitte)
+  const SOLL_R = { bull: 0.019, outer: 0.066, single: 0.28, triple: 0.578, double: 0.96 };
+  const sollR = SOLL_R[kind];
+  if (!sollR) return null; // miss / unbekannt: nichts zu lernen
+  let gelerntRot = false, gelerntR = false;
+  const erg = { ...cal };
+  // Radius-Nachfuehrung: nach dem Lernen soll DIESER Pixel auf der Soll-Ringmitte
+  // normieren -> rx_neu = pixelDist/sollR, also Faktor istR/sollR (gedaempft 35 %)
+  if (istR > 1.35) return null; // Pfeil weit ausserhalb: Fehlmessung/Fehltipp
+  const fSoll = Math.min(1.25, Math.max(0.8, istR / sollR));
+  if (Math.abs(fSoll - 1) > 0.005) {
+    const f = 1 + 0.35 * (fSoll - 1);
+    erg.rx = (cal.rx || cal.r) * f;
+    erg.ry = (cal.ry || cal.r) * f;
+    erg.r = cal.r * f;
+    gelerntR = true;
+  }
+  // Winkel-Nachfuehrung (nur Sektorfelder, nicht bull/25)
+  if (nummer && nummer >= 1 && nummer <= 20) {
+    const idx = SEKTORZAHLEN.indexOf(nummer);
+    if (idx >= 0) {
+      let istAng = Math.atan2(n.u, -n.v) * 180 / Math.PI - (cal.rot || 0);
+      istAng = ((istAng % 360) + 360) % 360;
+      const sollAng = idx * 18;
+      const dRot = ((sollAng - istAng + 540) % 360) - 180;
+      // |dRot| <= 26: Sektorstreuarbeit + echter Kalibrierfehler - lernen lohnt.
+      // Groesser = Fehltipp / Kamera total verstellt: nur zaehlen, nicht lernen.
+      if (Math.abs(dRot) <= 26 && Math.abs(dRot) > 0.2) {
+        erg.rot = ((cal.rot || 0) - dRot * 0.5 + 540) % 360 - 180;
+        gelerntRot = true;
+      }
+    }
+  }
+  if (!gelerntRot && !gelerntR) return null;
+  // h konsistent mitskalieren: bullM um (cx,cy) mit f verschieben, Homographie neu bauen
+  if (cal.h && gelerntR) {
+    const f2 = erg.rx / (cal.rx || cal.r);
+    let bp = null;
+    try { bp = normierraumZuBild(0, 0, cal); } catch (e) { bp = null; }
+    if (bp) {
+      const mx = cal.cx + (bp.x - cal.cx) * f2, my = cal.cy + (bp.y - cal.cy) * f2;
+      const hNeu = baueHomographie(cal.cx, cal.cy, erg.rx, erg.ry, cal.theta || 0, mx, my);
+      if (hNeu) erg.h = hNeu;
+    }
+  }
+  erg.gelernt = (erg.gelernt || 0) + 1;
+  return erg;
+}

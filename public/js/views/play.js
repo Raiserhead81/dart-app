@@ -16,8 +16,9 @@ import { turnHoldMs } from '/js/core/turnhold.js';
 import { padThrow, padSpecial, pushSnapshot, popSnapshot, checkoutLine, HAPTIC } from '/js/core/pad.js';
 import { activePlayer, store, rerender } from '/js/app.js';
 import { cricketMarksTable } from '/js/views/cricket-ui.js';
-import { mountCam, unmountCam, toggleAufnahme, tapEingabeAnbinden, autoKalibriere, leseAnsichtsZoom } from '/js/views/camera.js';
+import { mountCam, unmountCam, toggleAufnahme, tapEingabeAnbinden, autoKalibriere, leseAnsichtsZoom, starteKorrekturTap, segVonPixel } from '/js/views/camera.js';
 import { saveCal, setCal, camCalRef } from '/js/views/camera.js';
+import { lerneAusKorrektur } from '/js/core/camera-engine.js';
 
 const STARTS = [101, 170, 301, 501, 701, 1001];
 const restTickMemo = {}; // letzter Rest je Spieler — fuer den Score-Tick beim Wechsel
@@ -195,12 +196,8 @@ function renderX01Game(view) {
           if (vg) { vg.style.paddingTop = 'calc(55vh + 10px)'; vg.style.minHeight = '0'; vg.style.height = 'auto'; }
           return h;
         })();
-        mountCam(host, (seg) => {
-          const korrektur = el('div', { style: 'position:fixed;left:50%;transform:translateX(-50%);bottom:86px;z-index:60;background:var(--red-deep);border:1px solid var(--red);border-radius:12px;padding:10px 16px;font-weight:900;font-size:14px;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.5)' },
-            el('span', {}, `${seg.label} GEZÄHLT — falsch? `),
-            el('button', { class: 'btn small', onclick: () => { korrektur.remove(); undo(session); toast('Zurückgenommen - bitte manuell tippen'); } }, 'korrigieren'));
-          document.body.append(korrektur);
-          setTimeout(() => korrektur.remove(), 3000);
+        mountCam(host, (seg, punkt) => {
+          zeigeKorrekturBanner(session, document.getElementById('view'), seg, punkt);
           firePad(session, document.getElementById('view'), () => makeThrow(seg.k === 'outer' ? 'outer' : seg.k, seg.n));
         });
         e.currentTarget.classList.add('danger');
@@ -242,7 +239,7 @@ function renderX01Game(view) {
       const vg = document.querySelector('.view-game');
       if (vg) { vg.style.paddingTop = 'calc(55vh + 10px)'; vg.style.minHeight = '0'; vg.style.height = 'auto'; }
       const quit = el('button', { class: 'gbtn danger', style: 'position:absolute;top:8px;right:8px;z-index:5', onclick: () => endEarly() }, 'Beenden');
-      const camHinweis = el('div', { style: 'position:absolute;bottom:64px;left:50%;transform:translateX(-50%);background:rgba(7,11,9,.92);border:1px solid var(--green);padding:10px 22px;border-radius:12px;font-size:16px;font-weight:900;color:#fff;z-index:5;letter-spacing:.04em;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.6);animation:camPulse 1.2s ease-in-out infinite' }, '👆 TIPP JETZT auf deinen Treffer');
+      const camHinweis = el('div', { id: 'camHinweis', style: 'position:absolute;bottom:64px;left:50%;transform:translateX(-50%);background:rgba(7,11,9,.92);border:1px solid var(--green);padding:10px 22px;border-radius:12px;font-size:16px;font-weight:900;color:#fff;z-index:5;letter-spacing:.04em;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.6);animation:camPulse 1.2s ease-in-out infinite' }, '👆 TIPP JETZT auf deinen Treffer');
       h.append(camHinweis);
       // ECHTE Auto-Kalibrierung: Ein Button, Scheibe muss sichtbar sein, fertig.
       const kalibStatus = store.state.settings.cameraCal;
@@ -273,13 +270,16 @@ function renderX01Game(view) {
       h.append(rec, quit);
       return h;
     })();
-    mountCam(camHost, (seg) => {
-      const korrektur = el('div', { style: 'position:fixed;left:50%;transform:translateX(-50%);bottom:86px;z-index:60;background:var(--red-deep);border:1px solid var(--red);border-radius:12px;padding:10px 16px;font-weight:900;font-size:14px;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.5)' },
-        el('span', {}, `${seg.label} GEZÄHLT — falsch? `),
-        el('button', { class: 'btn small', onclick: () => { korrektur.remove(); undo(session); toast('Zurückgenommen - bitte manuell tippen'); } }, 'korrigieren'));
-      document.body.append(korrektur);
-      setTimeout(() => korrektur.remove(), 3000);
+    mountCam(camHost, (seg, punkt) => {
+      zeigeKorrekturBanner(session, view, seg, punkt);
       firePad(session, view, () => makeThrow(seg.k === 'outer' ? 'outer' : seg.k, seg.n));
+    }, (st) => {
+      // Orientierungswechsel: Auto-Nachkalibrierung sichtbar machen
+      const ch = document.getElementById('camHinweis');
+      if (!ch) return;
+      if (st === 'orient') { ch.textContent = 'Orientierung geaendert - kalibriere neu...'; ch.style.borderColor = 'var(--gold)'; }
+      if (st === 'orient-ok') { ch.textContent = 'NEU KALIBRIERT ✓ - weiter'; ch.style.borderColor = 'var(--green)'; }
+      if (st === 'orient-fail') { ch.textContent = 'Neu kalibrieren: Bull-Mitte + untere Doppelkante tippen'; ch.style.borderColor = '#e33'; }
     });
     // KAY: TAP-AUF-DIE-SCHEIBE - Kamerabild ist das Eingabepad
     setTimeout(() => {
@@ -605,6 +605,40 @@ function undo(session) {
 }
 
 // KAY: Erkanntes Board-Raster uebers Kamerabild zeichnen (Erfolgskontrolle)
+// KAY: KORREKTUR MIT LERNEN - wenn die Automatik falsch gezählt hat, tippt Kay auf
+// die ECHTE Pfeilspitze. Die App zaehlt das richtige Feld UND fuehrt die Kalibrierung
+// daempfig nach (rot + rx/ry), damit der naechste Wurf von selbst stimmt.
+function zeigeKorrekturBanner(session, view, seg, punkt) {
+  const korrektur = el('div', { style: 'position:fixed;left:50%;transform:translateX(-50%);bottom:86px;z-index:60;background:var(--red-deep);border:1px solid var(--red);border-radius:12px;padding:10px 16px;font-weight:900;font-size:14px;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.5)' },
+    el('span', {}, `${seg.label} GEZÄHLT — falsch? `),
+    el('button', { class: 'btn small', onclick: () => {
+      korrektur.remove();
+      const v = document.querySelector('#camhost video');
+      if (!v || !camCalRef()) { undo(session); toast('Zurückgenommen - bitte manuell tippen'); return; }
+      const hinweis = document.getElementById('camHinweis');
+      if (hinweis) { hinweis.textContent = '🔧 KORREKTUR: Auf die ECHTE Pfeilspitze tippen'; hinweis.style.borderColor = 'var(--red)'; }
+      toast('KORREKTUR: Auf die echte Pfeilspitze tippen');
+      starteKorrekturTap(v, (p) => {
+        const soll = segVonPixel(p.x, p.y, camCalRef());
+        if (hinweis) { hinweis.textContent = '👆 TIPP JETZT auf deinen Treffer'; hinweis.style.borderColor = 'var(--green)'; }
+        if (!soll) { toast('Außerhalb der Scheibe - Zahl bitte manuell tippen'); return; }
+        undo(session);
+        firePad(session, view, () => makeThrow(soll.k === 'outer' ? 'outer' : soll.k, soll.n));
+        toast('Korrigiert: ' + soll.label);
+        if (punkt && Number.isFinite(punkt.x)) {
+          const calNeu = lerneAusKorrektur(punkt.x, punkt.y, soll.k === 'outer' ? 'outer' : soll.k, soll.n, camCalRef());
+          if (calNeu) {
+            setCal(calNeu); saveCal();
+            try { zeichneBoardOverlay(v, calNeu); } catch (e) {}
+            toast('Kalibrierung gelernt (' + (calNeu.gelernt || 1) + '. Korrektur)');
+          }
+        }
+      });
+    } }, 'korrigieren'));
+  document.body.append(korrektur);
+  setTimeout(() => korrektur.remove(), 6000);
+}
+
 function zeichneBoardOverlay(videoEl, cal) {
   let c = document.getElementById('camoverlay');
   if (!c) {
@@ -654,7 +688,7 @@ function baueKameraBereich(session, view) {
   })();
   if (h.dataset.komplett !== '1') {
     h.dataset.komplett = '1';
-    const camHinweis = el('div', { style: 'position:absolute;bottom:64px;left:50%;transform:translateX(-50%);background:rgba(7,11,9,.92);border:1px solid var(--green);padding:10px 22px;border-radius:12px;font-size:16px;font-weight:900;color:#fff;z-index:5;letter-spacing:.04em;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.6);animation:camPulse 1.2s ease-in-out infinite' }, '👆 TIPP JETZT auf deinen Treffer');
+    const camHinweis = el('div', { id: 'camHinweis', style: 'position:absolute;bottom:64px;left:50%;transform:translateX(-50%);background:rgba(7,11,9,.92);border:1px solid var(--green);padding:10px 22px;border-radius:12px;font-size:16px;font-weight:900;color:#fff;z-index:5;letter-spacing:.04em;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.6);animation:camPulse 1.2s ease-in-out infinite' }, '👆 TIPP JETZT auf deinen Treffer');
     const hatKalib = !!store.state.settings.cameraCal;
     camHinweis.textContent = hatKalib ? '👆 TIPP JETZT auf deinen Treffer' : '⚠ Erst kalibrieren: Profil → Kamera-Assistent';
     h.append(camHinweis);

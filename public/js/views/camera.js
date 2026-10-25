@@ -188,8 +188,8 @@ export function startAuto(onThrow, onStatus) {
         const seg = segVonPixel(p.x, p.y, cal);
         const selbeStelle = pending && Math.abs(pending.x - p.x) < 18 && Math.abs(pending.y - p.y) < 18;
         if (selbeStelle && pending.count >= 1 && seg) {
-          // 2 Frames stabil + gueltiges Segment => Wurf!
-          onThrow(seg);
+          // 2 Frames stabil + gueltiges Segment => Wurf! Punkt mitgeben (fuer Lern-Korrektur)
+          onThrow(seg, { x: p.x, y: p.y });
           lastFrame = frameGrab();
           pending = null;
           bounces = 0;
@@ -221,6 +221,31 @@ export function startAuto(onThrow, onStatus) {
 export function stopAuto() { if (autoTimer) { clearInterval(autoTimer); autoTimer = null; } }
 export function camCal() { return cal; }
 
+// KAY: KORREKTUR-TAP - wenn die Automatik falsch gezaehlt hat, tippt Kay auf die
+// ECHTE Pfeilposition. Einmaliger Capture-Handler (blockt den normalen Treffer-Tap),
+// liefert Video-Pixel an fertig(px, py).
+let korrekturAktiv = false;
+export function starteKorrekturTap(videoEl, fertig) {
+  if (!videoEl) return;
+  korrekturAktiv = true;
+  const handler = (ev) => {
+    videoEl.removeEventListener('click', handler, true);
+    ev.stopPropagation();
+    korrekturAktiv = false;
+    const rect = videoEl.getBoundingClientRect();
+    const zoom = leseAnsichtsZoom(videoEl);
+    const ow = videoEl.offsetWidth || videoEl.videoWidth, oh = videoEl.offsetHeight || videoEl.videoHeight;
+    const lx = (ev.clientX - rect.left) / zoom, ly = (ev.clientY - rect.top) / zoom;
+    const sc = Math.min(ow / (videoEl.videoWidth || ow), oh / (videoEl.videoHeight || oh));
+    const offX = (ow - (videoEl.videoWidth || ow) * sc) / 2, offY = (oh - (videoEl.videoHeight || oh) * sc) / 2;
+    fertig({ x: (lx - offX) / sc, y: (ly - offY) / sc });
+  };
+  videoEl.addEventListener('click', handler, true);
+  // Sicherheitsnetz: nach 12s abbrechen, sonst bleibt jeder Tap gefangen
+  setTimeout(() => { videoEl.removeEventListener('click', handler, true); korrekturAktiv = false; }, 12000);
+}
+export function istKorrekturAktiv() { return korrekturAktiv; }
+
 // SPIEL-EINBAU: Kamera-PiP in beliebigem Host-Element + Auto-Zaehlung.
 // onThrow(seg) wird bei jedem erkannten Dart gerufen. Kalibrierung per Tap aufs PiP.
 export function mountCam(host, onThrow, onStatus) {
@@ -244,6 +269,26 @@ export function mountCam(host, onThrow, onStatus) {
   const zoomRow = el('div', {}, zoomLabel);
   host.append(frame, zoomRow, zoom, note);
   video = v; // Modul-Referenz fuer frameGrab/startAuto
+  // KAY STATIV: Orientierungswechsel (Hoch<->Quer) aendert den Video-Pixelraum -
+  // die alte Kalibrierung waere unbrauchbar. Automatisch NEU kalibrieren (Stativ
+  // steht still, Scheibe auch - Auto-Kalibrierung greift ohne Zutun).
+  v.addEventListener('resize', async () => {
+    if (!v.videoWidth || !cal || !cal.ar) return;
+    const neuAR = v.videoWidth / v.videoHeight;
+    if (Math.abs(neuAR / cal.ar - 1) < 0.15) return;
+    cal = null; saveCal();
+    const oc = document.getElementById('camoverlay');
+    if (oc) oc.getContext('2d').clearRect(0, 0, oc.width, oc.height);
+    if (onStatus) { try { onStatus('orient'); } catch (_) {} }
+    try {
+      const erg = await autoKalibriere(v);
+      if (erg) {
+        setCal(erg); saveCal();
+        try { zeichneRaster(v, erg); } catch (_) {}
+        if (onStatus) onStatus('orient-ok');
+      } else if (onStatus) onStatus('orient-fail');
+    } catch (e) { if (onStatus) onStatus('orient-fail'); }
+  });
   const phase = { m: 'idle' };
   v.onclick = async (ev) => {
     if (phase.mode === 'kalib-bull' || phase.mode === 'kalib-rand') {
@@ -309,6 +354,7 @@ export function mountCam(host, onThrow, onStatus) {
 // Tap auf den Treffer => Segment => onThrow. Robust, sofort, ohne Erkennungsrisiko.
 export function tapEingabeAnbinden(videoEl, onThrow, onKalibHinweis) {
   videoEl.addEventListener('click', (ev) => {
+    if (korrekturAktiv) return; // Korrektur-Tap hat Vorrang
     if (!cal) { if (onKalibHinweis) onKalibHinweis(); return; }
     // BEWIESENE Core-Kette (tests/tap-kette.test.js): Finger -> Video -> Feld
     const rect = videoEl.getBoundingClientRect();
@@ -544,7 +590,8 @@ export function autoKalibriere(videoEl, onProgress) {
     resolve({
       cx: med(ergs, 'cx') * skal, cy: med(ergs, 'cy') * skal, r: med(ergs, 'r') * skal,
       rx: med(ergs, 'rx') * skal, ry: med(ergs, 'ry') * skal, theta: med(ergs, 'theta'),
-      rot: medAng(), h, qualitaet: qs.sort((a, b) => a - b)[Math.floor(qs.length / 2)]
+      rot: medAng(), h, qualitaet: qs.sort((a, b) => a - b)[Math.floor(qs.length / 2)],
+      ar: videoEl.videoWidth > 0 ? videoEl.videoWidth / videoEl.videoHeight : undefined
     });
   });
 }
