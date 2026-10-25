@@ -564,9 +564,12 @@ export function renderCamera(view) {
 
 export function autoKalibriere(videoEl, onProgress) {
   // 5 Frames im Abstand analysieren, Median aus den guten Ergebnissen.
-  // onProgress(prozent, guteFrames) fuer Live-Anzeige "xx % kalibriert".
+  // onProgress(prozent, guteFrames, bestQ) fuer Live-Anzeige "SEHE SCHEIBE / sehe nichts".
+  // Misserfolg: autoKalibriere.diag = { warum, bestQ, hell, frames } - KLARTEXT statt stumm null.
   return new Promise(async (resolve) => {
     const ergs = [];
+    let bestQ = 0, bestE = null, hellSum = 0, hellN = 0;
+    if (!videoEl || !videoEl.videoWidth) { autoKalibriere.diag = { warum: 'KAMERA LIEFERT KEIN BILD - Kamera neu starten' }; resolve(null); return; }
     for (let f = 0; f < 5; f++) {
       try {
         const c = document.createElement('canvas');
@@ -574,15 +577,29 @@ export function autoKalibriere(videoEl, onProgress) {
         c.width = zielW; c.height = Math.round(zielW * videoEl.videoHeight / videoEl.videoWidth);
         c.getContext('2d', { willReadFrequently: true }).drawImage(videoEl, 0, 0, zielW, c.height);
         const data = c.getContext('2d').getImageData(0, 0, zielW, c.height);
+        // KAY-DIAGNOSE: Helligkeit ueber Stichprobe
+        for (let i = 0; i < data.data.length; i += 4 * 997) { hellSum += (data.data[i] + data.data[i + 1] + data.data[i + 2]) / 3; hellN++; }
         const e = analyseBoardInFrame(data);
         // QUALITAETS-GATE: nur echte Boards akzeptieren (kein TV / Wand / Rauschen)
         const q = e && typeof e.qualitaet === 'number' ? e.qualitaet : 0;
+        if (q > bestQ) { bestQ = q; bestE = e; }
         if (e && q >= 60 && e.r > 25 && e.r < zielW * 0.75) ergs.push(e);
       } catch (err) { /* Frame-Drop */ }
-      if (onProgress) { try { onProgress(Math.round((f + 1) / 5 * 100), ergs.length); } catch (_) {} }
+      if (onProgress) { try { onProgress(Math.round((f + 1) / 5 * 100), ergs.length, Math.round(bestQ)); } catch (_) {} }
       await new Promise(r => setTimeout(r, 250));
     }
-    if (ergs.length < 3) { resolve(null); return; }
+    const hell = hellN ? hellSum / hellN : 0;
+    if (ergs.length < 3) {
+      let warum;
+      if (hell < 25) warum = 'ZU DUNKEL (Helligkeit ' + Math.round(hell) + ') - Licht an / Taschenlampe an die Scheibe';
+      else if (bestQ >= 60) warum = 'SCHEIBE GESEHEN, aber unsicher (' + ergs.length + '/5 Frames, q=' + Math.round(bestQ) + ') - Handy ruhig halten und nochmal';
+      else if (bestE && bestE.r > 0 && bestE.r <= 25) warum = 'SCHEIBE ZU KLEIN / zu weit weg (r=' + Math.round(bestE.r) + 'px) - Handy naeher ran';
+      else if (bestE && bestE.r >= 270 * 0.75) warum = 'SCHEIBE ZU GROSS / zu nah (r=' + Math.round(bestE.r) + 'px) - Handy weiter weg';
+      else warum = 'KEINE SCHEIBE IM BILD (bestes q=' + Math.round(bestQ) + ', Helligkeit ' + Math.round(hell) + ') - Scheibe mittig, gut anleuchten';
+      autoKalibriere.diag = { warum, bestQ: Math.round(bestQ), hell: Math.round(hell), frames: ergs.length };
+      resolve(null); return;
+    }
+    autoKalibriere.diag = null;
     const qs = ergs.map(e => e.qualitaet || 0);
     const med = (arr, key) => { const v = arr.map(e => e[key]).sort((a, b) => a - b); return v[Math.floor(v.length / 2)]; };
     // zirkulaerer Median fuer den Rotationswinkel (0..360, kein Umbruch bei 359->1)

@@ -1,0 +1,15 @@
+const die = (m) => { console.log(m); process.exit(0); };
+const PAGES = await fetch('http://127.0.0.1:9223/json/list', { signal: AbortSignal.timeout(6000) }).then(r => r.json()).catch(() => null);
+if (!PAGES) die('CDP tot');
+const page = PAGES.find(p => p.type === 'page');
+const ws = new WebSocket(page.webSocketDebuggerUrl);
+let id = 0; const waiters = new Map();
+const send = (m, p = {}) => new Promise(res => { const i = ++id; waiters.set(i, res); ws.send(JSON.stringify({ id: i, method: m, params: p })); });
+ws.onmessage = (ev) => { const m = JSON.parse(ev.data); if (m.id && waiters.has(m.id)) { waiters.get(m.id)(m.result); waiters.delete(m.id); } };
+await new Promise(r => ws.onopen = r);
+setTimeout(() => process.exit(0), 8000);
+await send('Runtime.enable');
+const ev = async (e) => { try { return (await send('Runtime.evaluate', { expression: e, returnByValue: true, awaitPromise: true })).result?.value; } catch { return '?'; } };
+console.log('ZOOM   :', await ev(`Object.fromEntries(Object.keys(localStorage).filter(k=>/zoom|lens/i.test(k)).map(k=>[k, localStorage.getItem(k)]))`));
+console.log('TRACKS :', await ev(`[...document.querySelectorAll('video')].map(v=>{const t=v.srcObject&&v.srcObject.getVideoTracks()[0]; return t?JSON.stringify(t.getSettings()):'kein track'}).join(' ; ')`));
+process.exit(0);

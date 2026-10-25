@@ -248,7 +248,15 @@ function renderX01Game(view) {
         kalibBtn.textContent = 'Kalibriere… 0 %';
         kalibBtn.disabled = true;
         const v = document.querySelector('#camhost video');
-        const erg = v ? await autoKalibriere(v, (p) => { kalibBtn.textContent = 'Kalibriere… ' + p + ' %'; }) : null;
+        const erg = v ? await autoKalibriere(v, (p, gute, bestQ) => {
+          kalibBtn.textContent = 'Kalibriere… ' + p + ' %';
+          // KAY: Klartext - SEHE SCHEIBE oder eben nicht, MIT Messwerten
+          camHinweis.style.animation = 'none';
+          camHinweis.style.borderColor = gute > 0 ? 'var(--green)' : '#e33';
+          camHinweis.textContent = gute > 0
+            ? 'SEHE SCHEIBE ✓ (q=' + bestQ + ') - messe ' + p + ' %…'
+            : 'sehe noch KEINE Scheibe… (' + p + ' %, q=' + bestQ + ')';
+        }) : null;
         kalibBtn.disabled = false;
         if (erg) {
           setCal(erg); saveCal();
@@ -258,7 +266,10 @@ function renderX01Game(view) {
           zeichneBoardOverlay(v, erg);
           setTimeout(() => { kalibBtn.textContent = 'Scheibe neu kalibrieren'; }, 2500);
         } else {
-          kalibBtn.textContent = 'Nicht gefunden - nochmal (gutes Licht!)';
+          const d = autoKalibriere.diag;
+          kalibBtn.textContent = '✗ Nicht erkannt - nochmal';
+          camHinweis.style.borderColor = '#e33';
+          camHinweis.textContent = 'SEHE SCHEIBE NICHT ✗ ' + (d ? d.warum : 'unbekannter Grund');
         }
       };
       h.append(kalibBtn);
