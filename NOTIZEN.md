@@ -1,5 +1,11 @@
 # NOTIZEN dart-app
 
+## 2026-10-25 Kalibrier-Klartext + LIVE-Diagnose (Deploy 1.0.1792954770, Commit d179c05)
+- KAYS FORDERUNG "er muss doch sagen sehe scheibe oder sehe nicht scheibe": UMGESETZT. autoKalibriere sammelt jetzt Diagnose (Helligkeit, bestes q, gute Frames) und schreibt bei Misserfolg autoKalibriere.diag = { warum, bestQ, hell, frames }. play.js zeigt WAEHREND der Messung camHinweis "SEHE SCHEIBE ✓ (q=xx) - messe..%" bzw "sehe noch KEINE Scheibe..(q=xx)" und danach Klartext-Grund: ZU DUNKEL / SCHEIBE UNSICHER (x/5 Frames) / SCHEIBE ZU KLEIN / SCHEIBE ZU GROSS zu nah / KEINE SCHEIBE IM BILD. onProgress-Signatur: (prozent, gute, bestQ).
+- LIVE-BEWEIS am Oppo (scripts/oppo-diag.mjs / oppo-watch.mjs): Kays Fehlschlag war ECHT messbar - Video 2464x3280, Ellipse r=230 > Gate 202 (Scheibe lief links+rechts aus dem Bild), q=38, focusDistance 0.15m (Kamera Nahfokus!) => Handy stand zu nah. Empfehlung: Scheibe KOMPLETT im Bild mit Rand.
+- ZWEITE Live-Runde: hell=10, KEIN FIT - Handy zeigte ins Dunkle. Watch-Loop 10x3s zeigt kontinuierlich hell/q/r/cx/cy.
+- Session-Ende: Kay legt Pause. Naechster Schritt: Stativ + gutes Licht + Scheibe ganz im Bild => kalibrieren => Klartext bestaetigen.
+
 ## 2026-10-25 GITTERMODELL: Scheibe pixel-fuer-pixel vermessen (Deploy 1.0.1792953317, Commit 60abbe8)
 - KAYS AUFRAG "mach ein gittermodell das er die scheibe pixel fuer pixel vermessen kann": UMGESETZT als vermesseScheibe(img, cal, N) in der Engine.
 - PRINZIP: 128x128-Gitter ueber den Normierraum, jeder Punkt per normierraumZuBild (Homographie/affin) ZURUECK ins Bild gemappt, echte Pixelfarbe gelesen, gegen Soll-Modell geprueft: 20 Sektoren x 6 Ringzonen (Bull rot, 25er gruen, Triple/Double rot-gruen je nach schwarzer/weisser Sector, Singles dunkel-hell). Sektor-Mathe IDENTISCH zu segVonPixel (atan2(u,-v)-cal.rot, /18, %20) -> Gitter und Wertung rechnen exakt gleich.
