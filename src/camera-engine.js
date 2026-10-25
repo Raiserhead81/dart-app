@@ -566,3 +566,96 @@ export function lerneAusKorrektur(px, py, kind, nummer, c) {
   erg.gelernt = (erg.gelernt || 0) + 1;
   return erg;
 }
+
+// ============ GITTERMODELL v7: Scheibe pixel-fuer-pixel vermessen ============
+// Legt ein N x N-Gitter ueber den Normierraum, mappt jeden Punkt per Homographie
+// zurueck ins Bild, liest die echte Pixelfarbe und prueft sie gegen das
+// Soll-Modell (20 Sektoren x Zonen). Liefert Trefferquoten je Zone/Sektor.
+const GITTER_SCHWARZE = new Set([20, 18, 13, 10, 2, 3, 7, 8, 14, 12]); // schwarze Singles = ROTE Ringe
+export function vermesseScheibe(img, c, N) {
+  const n = N || 128, W = img.width, H = img.height, D = img.data;
+  let maxK = 1;
+  for (let i = 0; i < D.length; i += 3989) if (D[i] > maxK) maxK = D[i]; // Stichprobe (16-Bit-Support)
+  const rgb2hsv = (r, g, b) => {
+    r /= maxK; g /= maxK; b /= maxK;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+    let h = 0;
+    if (d > 1e-9) {
+      if (mx === r) h = 60 * (((g - b) / d) % 6);
+      else if (mx === g) h = 60 * ((b - r) / d + 2);
+      else h = 60 * ((r - g) / d + 4);
+      if (h < 0) h += 360;
+    }
+    return [h, mx ? d / mx : 0, mx];
+  };
+  const klasse = (r, g, b) => {
+    const [h, sv, vv] = rgb2hsv(r, g, b);
+    if ((h < 25 || h > 335) && sv > 0.30 && vv > 0.15) return 'rot';
+    if (h > 80 && h < 165 && sv > 0.22 && vv > 0.12) return 'gruen';
+    if (vv < 0.35) return 'dunkel';
+    if (vv > 0.72 && sv < 0.30) return 'hell';
+    return 'sonst';
+  };
+  const zona = (r) => r <= RINGE.bull ? 'bull' : r <= RINGE.bull25 ? 'bull25'
+    : r <= RINGE.tripleIn ? 'singleIn' : r <= RINGE.tripleOut ? 'triple'
+    : r <= RINGE.doubleIn ? 'singleOut' : r <= 1.0 ? 'double' : null;
+  const sektorVon = (u, v) => {
+    let ang = Math.atan2(u, -v) * 180 / Math.PI - (c.rot || 0);
+    if (ang < 0) ang += 360; if (ang >= 360) ang -= 360;
+    return SEKTORZAHLEN[Math.round(ang / 18) % 20];
+  };
+  const Z = { bull: { soll: 'rot' }, bull25: { soll: 'gruen' }, singleIn: {}, triple: {}, singleOut: {}, double: {} };
+  for (const k of Object.keys(Z)) Z[k].n = Z[k].rot = Z[k].gruen = Z[k].dunkel = Z[k].hell = Z[k].sonst = 0;
+  const farbSek = {}, singleSek = {}; // je Zone|Sektor: Ring-Farben bzw. Single-Helligkeit
+  const SEK = (m, sek, zone) => { const k = zone + '|' + sek; if (!farbSek[k]) farbSek[k] = { rot: 0, gruen: 0 }; farbSek[k][m]++; };
+  let inBoard = 0;
+  for (let gy = 0; gy < n; gy++) for (let gx = 0; gx < n; gx++) {
+    const u = (gx / (n - 1)) * 2 - 1, v = (gy / (n - 1)) * 2 - 1;
+    const r = Math.hypot(u, v);
+    const z = zona(r); if (!z) continue;
+    const p = normierraumZuBild(u, v, c);
+    const px = Math.round(p.x), py = Math.round(p.y);
+    if (px < 0 || py < 0 || px >= W || py >= H) continue;
+    const i = (py * W + px) * 4;
+    const kl = klasse(D[i], D[i + 1], D[i + 2]);
+    inBoard++;
+    Z[z][kl]++; Z[z].n++;
+    const sek = sektorVon(u, v);
+    if ((z === 'triple' || z === 'double') && (kl === 'rot' || kl === 'gruen')) SEK(kl, sek, z);
+    if (z === 'singleIn' || z === 'singleOut') {
+      const k2 = sek; if (!singleSek[k2]) singleSek[k2] = { dunkel: 0, hell: 0 };
+      if (kl === 'dunkel') singleSek[k2].dunkel++; else if (kl === 'hell') singleSek[k2].hell++;
+    }
+  }
+  // Auswertung: je Sektor dominante Farbe gegen Soll, Singles Helligkeit gegen Soll
+  const sektoren = [], singles = [];
+  let ok = 0, pruef = 0;
+  for (const z of ['triple', 'double'])
+    for (const zahl of SEKTORZAHLEN) {
+      const e = farbSek[z + '|' + zahl] || { rot: 0, gruen: 0 };
+      const sollRot = GITTER_SCHWARZE.has(zahl);
+      const domRot = e.rot >= e.gruen;
+      const gut = (e.rot + e.gruen) > 0 && domRot === sollRot;
+      ok += gut ? 1 : 0; pruef++;
+      sektoren.push({ zone: z, zahl, sollRot, rot: e.rot, gruen: e.gruen, ok: gut });
+    }
+  for (const zahl of SEKTORZAHLEN) {
+    const e = singleSek[zahl] || { dunkel: 0, hell: 0 };
+    const sollDunkel = GITTER_SCHWARZE.has(zahl);
+    const gut = (e.dunkel + e.hell) > 0 && (e.dunkel >= e.hell) === sollDunkel;
+    ok += gut ? 1 : 0; pruef++;
+    singles.push({ zahl, sollDunkel, dunkel: e.dunkel, hell: e.hell, ok: gut });
+  }
+  for (const zk of ['bull', 'bull25']) {
+    const e = Z[zk];
+    const gut = e.n > 0 && e[e.soll] >= e.n * 0.4;
+    ok += gut ? 1 : 0; pruef++;
+  }
+  return {
+    gitter: inBoard, aufloesung: n, zonen: Z,
+    sektoren, singles,
+    qualitaet: pruef ? Math.round(100 * ok / pruef) : 0,
+    fehler: [...sektoren.filter(s => !s.ok).map(s => s.zone[0].toUpperCase() + s.zahl),
+             ...singles.filter(s => !s.ok).map(s => 'S' + s.zahl)]
+  };
+}

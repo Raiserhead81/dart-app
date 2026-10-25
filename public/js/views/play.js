@@ -17,7 +17,7 @@ import { padThrow, padSpecial, pushSnapshot, popSnapshot, checkoutLine, HAPTIC }
 import { activePlayer, store, rerender } from '/js/app.js';
 import { cricketMarksTable } from '/js/views/cricket-ui.js';
 import { mountCam, unmountCam, toggleAufnahme, tapEingabeAnbinden, autoKalibriere, leseAnsichtsZoom, starteKorrekturTap, segVonPixel } from '/js/views/camera.js';
-import { saveCal, setCal, camCalRef } from '/js/views/camera.js';
+import { saveCal, setCal, camCalRef, gitterTest } from '/js/views/camera.js';
 import { lerneAusKorrektur } from '/js/core/camera-engine.js';
 
 const STARTS = [101, 170, 301, 501, 701, 1001];
@@ -262,6 +262,15 @@ function renderX01Game(view) {
         }
       };
       h.append(kalibBtn);
+      // GITTERMODELL: Scheibe pixel-fuer-pixel gegen das Soll-Modell vermessen
+      const gitterBtn = el('button', { class: 'btn', style: 'position:absolute;bottom:10px;right:10px;z-index:5;min-height:40px;padding:8px 12px', onclick: () => {
+        const v = document.querySelector('#camhost video');
+        const c = camCalRef();
+        if (!v || !v.videoWidth || !c) { camHinweis.textContent = 'ERST SCHEIBE KALIBRIEREN, dann Gitter-Test'; return; }
+        const erg = gitterTest(v, c);
+        if (erg && erg.fehlerText) camHinweis.textContent = 'Gitter-Test: kein Kamerabild - Kamera an?';
+      } }, '🔍 Gitter');
+      h.append(gitterBtn);
       const recLabel = el('span', {}, 'Rec');
       const rec = el('button', { class: 'gbtn', style: 'position:absolute;top:8px;right:86px;z-index:5', onclick: async () => {
         const zustand = await toggleAufnahme((size) => { recLabel.textContent = 'Rec'; window.__recInfo = 'fertig ' + (size / 1e6).toFixed(1) + 'MB'; });

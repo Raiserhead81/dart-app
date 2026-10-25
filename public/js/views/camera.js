@@ -6,7 +6,7 @@
 import { el } from '/js/util.js';
 import { store } from '/js/app.js';
 
-import { segVonPixel as _segVonPixel, findeNeuenPfeil as _finde, setEngineCal, analyseBoardInFrame, normierraumZuBild as _nrZuBild, tapZuVideoPixel as _tapZuVideoPixel } from '/js/core/camera-engine.js';
+import { segVonPixel as _segVonPixel, findeNeuenPfeil as _finde, setEngineCal, analyseBoardInFrame, normierraumZuBild as _nrZuBild, tapZuVideoPixel as _tapZuVideoPixel, vermesseScheibe, RINGE } from '/js/core/camera-engine.js';
 
 let stream = null, video = null, canvas = null, ctx = null;
 let recorder = null, recChunks = [], recOnStop = null;
@@ -56,6 +56,11 @@ let baseFrame = null; // ImageData vor dem Wurf
 export function segVonPixel(x, y, c) { return _segVonPixel(x, y, c || cal); }
 
 function frameGrab() {
+  // KAY-FIX 25.10.: canvas/ctx wurden NUR in renderCamera (alter Kamera-View) angelegt -
+  // im SPIEL (mountCam) waren sie null => frameGrab crashte => keine Kalibrierung, keine Pfeile.
+  // Lazy selbst anlegen, egal aus welchem View:
+  if (!canvas) { canvas = el('canvas', { style: 'display:none' }); ctx = canvas.getContext('2d', { willReadFrequently: true }); }
+  if (!video) return null;
   canvas.width = video.videoWidth; canvas.height = video.videoHeight;
   ctx.drawImage(video, 0, 0);
   return ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -647,5 +652,67 @@ function zeichneRaster(videoEl, calErg) {
     ctx.moveTo(vx + calErg.cx * sc, vy + calErg.cy * sc);
     ctx.lineTo(ex[0], ex[1]);
     ctx.stroke();
+  }
+}
+
+// ============ GITTERMODELL (Kay, 25.10.): Scheibe pixel-fuer-pixel vermessen ============
+// Misst das LIVE-Bild gegen das Soll-Modell (20 Sektoren x 6 Ringzonen) und
+// zeichnet das volle Gitter als Overlay. Zeigt Trefferquote + fehlerhafte Zonen.
+export function gitterTest(videoEl, calErg) {
+  const c = calErg || cal;
+  const frame = video && videoEl === video ? frameGrab() : (() => {
+    // fremdes Video (Spiel-View): eigenes Canvas einmalig nutzen
+    if (!gitterTest._cv) { gitterTest._cv = el('canvas', { style: 'display:none' }); gitterTest._cx = gitterTest._cv.getContext('2d', { willReadFrequently: true }); }
+    if (!videoEl.videoWidth) return null;
+    gitterTest._cv.width = videoEl.videoWidth; gitterTest._cv.height = videoEl.videoHeight;
+    gitterTest._cx.drawImage(videoEl, 0, 0);
+    return gitterTest._cx.getImageData(0, 0, gitterTest._cv.width, gitterTest._cv.height);
+  })();
+  if (!frame || !videoEl.videoWidth) return { fehlerText: 'Kein Kamerabild' };
+  const erg = vermesseScheibe(frame, c, 128);
+  zeichneGitterModell(videoEl, c);
+  let b = document.getElementById('gitterbanner');
+  if (!b) {
+    b = el('div', { id: 'gitterbanner', style: 'position:absolute;top:12px;left:50%;transform:translateX(-50%);z-index:6;background:rgba(7,11,9,.94);border:2px solid var(--green);border-radius:12px;padding:8px 16px;font-weight:900;color:#fff;pointer-events:none;white-space:nowrap;font-size:15px;box-shadow:0 8px 24px rgba(0,0,0,.6);max-width:96%;overflow:hidden;text-overflow:ellipsis' });
+    videoEl.parentElement.append(b);
+  }
+  const q = erg.qualitaet;
+  b.style.borderColor = q >= 90 ? 'var(--green)' : q >= 70 ? 'var(--gold)' : '#e33';
+  b.textContent = 'GITTER ' + q + ' % · ' + erg.gitter + ' Pkt' + (erg.fehler.length ? ' · ✗ ' + erg.fehler.slice(0, 8).join(' ') : ' · ✓ ALLE ZONEN OK');
+  clearTimeout(b._t); b._t = setTimeout(() => b.remove(), 12000);
+  return erg;
+}
+
+function zeichneGitterModell(videoEl, calErg) {
+  let c = document.getElementById('gitterov');
+  if (!c) { c = el('canvas', { id: 'gitterov', style: 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:4' }); videoEl.parentElement.append(c); }
+  const box = videoEl.getBoundingClientRect();
+  c.width = box.width; c.height = box.height;
+  const ctx = c.getContext('2d');
+  const ow = videoEl.offsetWidth, oh = videoEl.offsetHeight;
+  const zoom = leseAnsichtsZoom(videoEl);
+  const sc = Math.min(ow / videoEl.videoWidth, oh / videoEl.videoHeight) * zoom;
+  const vx = (box.width - videoEl.videoWidth * sc) / 2, vy = (box.height - videoEl.videoHeight * sc) / 2;
+  ctx.clearRect(0, 0, c.width, c.height);
+  const rot = calErg.rot || 0;
+  const zuScreen = (u, v) => { const p = _nrZuBild(u, v, calErg); return [vx + p.x * sc, vy + p.y * sc]; };
+  // alle 6 Ringe als Polygone (projektiv korrekt, auch ohne h)
+  ctx.strokeStyle = 'rgba(232,182,76,.9)'; ctx.lineWidth = 1.6;
+  for (const rr of [RINGE.bull, RINGE.bull25, RINGE.tripleIn, RINGE.tripleOut, RINGE.doubleIn, RINGE.doubleOut]) {
+    ctx.beginPath();
+    for (let k = 0; k <= 72; k++) {
+      const a = k / 72 * 2 * Math.PI;
+      const [sx, sy] = zuScreen(Math.sin(a) * rr, -Math.cos(a) * rr);
+      if (k === 0) ctx.moveTo(sx, sy); else ctx.lineTo(sx, sy);
+    }
+    ctx.closePath(); ctx.stroke();
+  }
+  // 20 Sektorspeichen
+  ctx.strokeStyle = 'rgba(70,196,122,.5)';
+  const [zx, zy] = zuScreen(0, 0);
+  for (let i = 0; i < 20; i++) {
+    const a = (i * 18 - 9 + rot) * Math.PI / 180;
+    const [ex, ey] = zuScreen(Math.sin(a), -Math.cos(a));
+    ctx.beginPath(); ctx.moveTo(zx, zy); ctx.lineTo(ex, ey); ctx.stroke();
   }
 }
