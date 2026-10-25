@@ -1,5 +1,11 @@
 # NOTIZEN dart-app
 
+## 2026-10-25 Licht-Gate-Fix + Torch (abends, Deploy 1.0.1792945895)
+- KAY-MELDUNG "schlechtes Licht obwohl viel Licht": BEWIESEN als False Negative des Echtheits-Gates. Repro scripts/repro-licht.mjs (Node, ruft analyseBoardInFrame direkt auf selbst gemaltes Board-Array): helle Wand + perfektes Board (ring 0.83, alt 0.7, bal 0.49) bekam q=45 FAIL, weil der K.O. `randDunkel<0.08` blind zuschlug - der Rand UNTER der Scheibe ist bei Tageslicht/heller Wand einfach nie dunkel. Ueberbelichtung 30% genauso gecapt.
+- FIX: randDunkel-K.O. entfernt; der eigentliche False-Positive-Schutz steht (ring<0.5 UND alt<0.65 -> Cap 45, TV/Wand weiterhin abgelehnt, 8/8 Tests). Neue Werte: helle Szenarien q=76 PASS, 50%-Auswaeschung weiterhin q=24 FAIL. randDunkel bleibt als 15-Punkte-Bonus (Anreiz dunkle Umgebung), kostet aber nicht mehr den Durchbruch.
+- KAY-MELDUNG "Taschenlampe geht nicht": (a) setzeTorch hielt applyConstraints-Erfolg fuer granted - Android-WebView resolved teils OHNE Fehler obwohl die Geraete-LED keine torch-capability hat (stiller Scheinerfolg). Jetzt getCapabilities().torch-Check -> ehrliches false -> Button zeigt 'kein Blitz'. (b) Torch existierte NUR im Profil-Assistenten - JETZT auch Blitz-Button im Spiel-PiP (mountCam, oben links, 💡).
+- Suite 190/190 vitest; E2E Stativ 3/3 + Homographie 6/6. Deploy 1.0.1792945895, Commit ee5d05a.
+
 ## 2026-10-25 Lernfunktion (Korrektur-Tap) + Orientierungswechsel-Auto (Stativ-Paket)
 - Kays Anforderung: Stativ schraeg, HOCH und QUER beide perfekt; App zaehlt Wuerfe, Kay tippt bei Fehler die ECHTE Pfeilposition -> App korrigiert Zaehlung UND lernt die Kalibrierung nach.
 - BAUTEIL 1 ENGINE (src/camera-engine.js): lerneAusKorrektur(px, py, kind, nummer, cal) - Radius-Nachfuehrung 35% gedaempft (Faktor istR/sollR, Clamp 0.8-1.25, Abweis wenn Ist-Punkt >1.35 Scheibenradien), Rotations-Nachfuehrung 50% (|dRot|<=26 Grad, >0.2 Grad), h via baueHomographie mitgelernt, erg.gelernt zaehlt. Richtungs-Beweise in tests/lernen.test.js (6 Tests): Konvergenz r 0.636->0.596 gegen 0.578, rx 81->87.2 gegen 90, rot gegen Abweichung.
