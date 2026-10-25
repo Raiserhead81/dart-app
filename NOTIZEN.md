@@ -1,5 +1,18 @@
 # NOTIZEN dart-app
 
+## 2026-10-25 GITTERMODELL: Scheibe pixel-fuer-pixel vermessen (Deploy 1.0.1792953317, Commit 60abbe8)
+- KAYS AUFRAG "mach ein gittermodell das er die scheibe pixel fuer pixel vermessen kann": UMGESETZT als vermesseScheibe(img, cal, N) in der Engine.
+- PRINZIP: 128x128-Gitter ueber den Normierraum, jeder Punkt per normierraumZuBild (Homographie/affin) ZURUECK ins Bild gemappt, echte Pixelfarbe gelesen, gegen Soll-Modell geprueft: 20 Sektoren x 6 Ringzonen (Bull rot, 25er gruen, Triple/Double rot-gruen je nach schwarzer/weisser Sector, Singles dunkel-hell). Sektor-Mathe IDENTISCH zu segVonPixel (atan2(u,-v)-cal.rot, /18, %20) -> Gitter und Wertung rechnen exakt gleich.
+- ERGEBNIS: qualitaet 0-100%, fehler-Liste (z.B. "D14 T9 S11" = welche Zone nicht passt), je Zone/Sektor-Zaehler. Perfekte Kalibrierung -> 100%, Versatz +30px -> Fehler sichtbar, Dunkelheit -> Farb-Ringe halten, Single-Helligkeit faellt raus (genau das misst es).
+- UI: Button "Gitter" im Spiel unten rechts neben Kalibrier-Button; zeichnet alle 6 Ringe + 20 Speichen als Overlay + Banner mit %-Wert/Fehlern (gruen ab 90, gold ab 70, rot darunter, 12s sichtbar).
+- NEBENFUND FIXED: RINGE wurde in camera.js:507 benutzt aber nie importiert (latenter ReferenceError in malOverlay) - jetzt importiert.
+- Tests: tests/gitter.test.js 4/4 (perfekt 100%, rot-Verdrehtung exakt entzaubert, +30px-Versatz erkannt, Dunkelheit), Suite 194/194, E2E-Import-Check ok.
+
+## 2026-10-25 ROOT CAUSE "kalibrieren geht null": frameGrab-Canvas-null (Deploy 1.0.1792948987)
+- KAY-MELDUNG "geht null" + "kalibrieren geht null" (App startet, Buttons tot): LIVE per WebView-CDP bewiesen - 3x TypeError in camera.js:58, frameGrab crashte, weil canvas/ctx NUR im alten Profil-Assistenten angelegt wurden, im SPIEL (mountCam) aber null blieben. Jeder Klick auf Kalibrieren/Erkennen starb still in der Exception.
+- FIX: frameGrab legt canvas/ctx jetzt LAZY selbst an (willReadFrequently-ctx) + video-Guard; funktioniert aus jedem View. Live auf Oppo geladen, KEINE Exceptions mehr, App reaktiv.
+- Display-Sperre-Problem (DevTools frieren ein): `svc power stayon usb` gesetzt - Display bleibt am USB-Kabel dauerhaft an, CDP stabil. oppo-live.mjs neu geschrieben (Timeout-Haertung, 6s-Stufen, garantiertes Exit).
+
 ## 2026-10-25 Licht-Gate-Fix + Torch (abends, Deploy 1.0.1792945895)
 - KAY-MELDUNG "schlechtes Licht obwohl viel Licht": BEWIESEN als False Negative des Echtheits-Gates. Repro scripts/repro-licht.mjs (Node, ruft analyseBoardInFrame direkt auf selbst gemaltes Board-Array): helle Wand + perfektes Board (ring 0.83, alt 0.7, bal 0.49) bekam q=45 FAIL, weil der K.O. `randDunkel<0.08` blind zuschlug - der Rand UNTER der Scheibe ist bei Tageslicht/heller Wand einfach nie dunkel. Ueberbelichtung 30% genauso gecapt.
 - FIX: randDunkel-K.O. entfernt; der eigentliche False-Positive-Schutz steht (ring<0.5 UND alt<0.65 -> Cap 45, TV/Wand weiterhin abgelehnt, 8/8 Tests). Neue Werte: helle Szenarien q=76 PASS, 50%-Auswaeschung weiterhin q=24 FAIL. randDunkel bleibt als 15-Punkte-Bonus (Anreiz dunkle Umgebung), kostet aber nicht mehr den Durchbruch.
