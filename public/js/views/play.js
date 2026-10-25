@@ -248,10 +248,10 @@ function renderX01Game(view) {
       const kalibStatus = store.state.settings.cameraCal;
       const kalibBtn = el('button', { class: 'btn primary', style: 'position:absolute;bottom:10px;left:50%;transform:translateX(-50%);z-index:5;min-height:40px;padding:8px 18px' }, kalibStatus ? 'Scheibe neu kalibrieren' : '① SCHEIBE KALIBRIEREN');
       kalibBtn.onclick = async () => {
-        kalibBtn.textContent = 'Kalibriere… (Scheibe frei lassen)';
+        kalibBtn.textContent = 'Kalibriere… 0 %';
         kalibBtn.disabled = true;
         const v = document.querySelector('#camhost video');
-        const erg = v ? await autoKalibriere(v) : null;
+        const erg = v ? await autoKalibriere(v, (p) => { kalibBtn.textContent = 'Kalibriere… ' + p + ' %'; }) : null;
         kalibBtn.disabled = false;
         if (erg) {
           setCal(erg); saveCal();

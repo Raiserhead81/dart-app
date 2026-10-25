@@ -5,6 +5,7 @@ import { el, icon, toast, download } from '/js/util.js';
 import { store, rerender } from '/js/app.js';
 import { configureCaller, callerSettings, unlockAudio } from '/js/caller-voice.js';
 import { startManualUpdateCheck } from '/js/update-manual.js';
+import { autoKalibriere, setCal, saveCal, camCalRef, setzeTorch } from '/js/views/camera.js';
 
 export function renderProfile(view) {
   const s = store.state;
@@ -95,14 +96,18 @@ export function renderProfile(view) {
       kalibBtn.onclick = async () => {
         const v = videoHost.querySelector('video');
         if (!v) { status.textContent = 'Erst Kamera anzeigen'; return; }
-        kalibBtn.textContent = 'Kalibriere…';
         const v2 = videoHost.querySelector('video');
         if (!v2 || !v2.videoWidth) { kalibBtn.textContent = 'Erst Kamera anzeigen!'; return; }
-        const erg = await autoKalibriere(v2);
+        kalibBtn.disabled = true;
+        const erg = await autoKalibriere(v2, (p, gute) => {
+          kalibBtn.textContent = 'Kalibriere… ' + p + ' %';
+          status.textContent = 'Kalibriere… ' + p + ' % (' + gute + '/5 Frames erkannt)';
+        });
+        kalibBtn.disabled = false;
         if (erg) {
           setCal(erg); saveCal();
           kalibBtn.textContent = 'Neu kalibrieren';
-          status.textContent = '✓ Automatisch kalibriert: Mitte ' + Math.round(erg.cx) + '/' + Math.round(erg.cy) + ', R=' + Math.round(erg.r) + 'px';
+          status.textContent = '✓ Automatisch kalibriert (' + Math.round(erg.r) + 'px Radius): Mitte ' + Math.round(erg.cx) + '/' + Math.round(erg.cy);
         } else {
           phase = 'kalib-bull';
           kalibBtn.textContent = 'Auto fehlgeschlagen - tippe aufs BULL';

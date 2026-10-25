@@ -424,9 +424,12 @@ export function renderCamera(view) {
   const kalibErgebnis = el('div', { class: 'small muted mt' }, '');
   const kalibBtn = el('button', { class: 'btn primary wide mt', style: 'display:none' }, '① SCHEIBE KALIBRIEREN');
   kalibBtn.onclick = async () => {
-    kalibBtn.textContent = 'Kalibriere… (Scheibe frei sichtbar)';
+    kalibBtn.textContent = 'Kalibriere… 0 %';
     kalibBtn.disabled = true;
-    const erg = await autoKalibriere(video);
+    const erg = await autoKalibriere(video, (p, gute) => {
+      kalibBtn.textContent = 'Kalibriere… ' + p + ' %';
+      kalibErgebnis.textContent = 'Analysiere Scheibe: ' + p + ' % (' + gute + '/5 Frames erkannt)…';
+    });
     kalibBtn.disabled = false;
     if (!erg) {
       // FALLBACK: automatisch gescheitert -> MANUELL per Finger-Tipps (100% zuverlaessig)
@@ -471,8 +474,9 @@ export function renderCamera(view) {
 
 // ---------- ECHTE Auto-Kalibrierung: Board aus den rot/gruenen Sektoren finden ----------
 
-export function autoKalibriere(videoEl) {
-  // 5 Frames im Abstand analysieren, Median aus den guten Ergebnissen
+export function autoKalibriere(videoEl, onProgress) {
+  // 5 Frames im Abstand analysieren, Median aus den guten Ergebnissen.
+  // onProgress(prozent, guteFrames) fuer Live-Anzeige "xx % kalibriert".
   return new Promise(async (resolve) => {
     const ergs = [];
     for (let f = 0; f < 5; f++) {
@@ -485,6 +489,7 @@ export function autoKalibriere(videoEl) {
         const e = analyseBoardInFrame(data);
         if (e && e.r > 25 && e.r < zielW * 0.75) ergs.push(e);
       } catch (err) { /* Frame-Drop */ }
+      if (onProgress) { try { onProgress(Math.round((f + 1) / 5 * 100), ergs.length); } catch (_) {} }
       await new Promise(r => setTimeout(r, 250));
     }
     if (ergs.length < 3) { resolve(null); return; }
