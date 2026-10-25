@@ -228,13 +228,25 @@ export function analyseBoardInFrame(img) {
       }
     }
     if (gs > 5) {
-      const istGr = (x, y) => {
-        if (x < 0 || y < 0 || x >= W || y >= H) return false;
-        const i = (y * W + x) * 4;
-        return istGruenPx(D[i], D[i + 1], D[i + 2]);
-      };
       let bestScore = -1e9, bestXY = null;
       const rKern = Math.max(2, r * 0.11), rFrei = r * 0.30;
+      // Rote Pixel im Fenster mit sammeln: um Triple-Gruen liegt ZWINGEND Rot
+      // benachbart (Sektoren alternieren im selben Band), um den 25er-Ring nicht
+      // (Rot erst ab 0.527r). Das trennt zuverlaessig auch bei starkem Tilt.
+      const rotPx = [];
+      {
+        const ctR = Math.cos(ellipse ? ellipse.theta : 0), stR = Math.sin(ellipse ? ellipse.theta : 0);
+        const RXr = ellipse ? ellipse.rx : r, RYr = ellipse ? ellipse.ry : r;
+        for (let y = Math.max(0, cy - fwG) | 0; y <= Math.min(H - 1, cy + fwG); y++) {
+          for (let x = Math.max(0, cx - fwG) | 0; x <= Math.min(W - 1, cx + fwG); x++) {
+            const dx = x - cx, dy = y - cy;
+            const u = (dx * ctR + dy * stR) / RXr, v = (-dx * stR + dy * ctR) / RYr;
+            if (u * u + v * v > 0.48 * 0.48) continue;
+            const i = (y * W + x) * 4;
+            if (istRotPx(D[i], D[i + 1], D[i + 2])) rotPx.push([x, y]);
+          }
+        }
+      }
       // 16 Richtungen scannen: das Gruen-Zentroid zeigt bei Schraegsicht zur
       // Triple-Masse, NICHT zum Bull - Richtung ist unzuverlaessig
       for (let ri = 0; ri < 16; ri++) {
@@ -246,6 +258,10 @@ export function analyseBoardInFrame(img) {
             const dd = Math.hypot(px - zx, py - zy);
             if (dd <= rKern) drin++;
             else if (dd <= rFrei) frei++;
+          }
+          for (const [px, py] of rotPx) {
+            const dd = Math.hypot(px - zx, py - zy);
+            if (dd > rKern && dd <= rFrei) frei++;
           }
           const score = drin - 2 * frei;
           if (score > bestScore) { bestScore = score; bestXY = [zx, zy]; }
@@ -306,15 +322,22 @@ export function analyseBoardInFrame(img) {
   const binRot = new Array(20).fill(0), binGruen = new Array(20).fill(0);
   for (let t = 0; t < 360; t += 3) {
     const rad2 = (t - 90) * Math.PI / 180;
-    for (const f of [0.58, 0.96]) {
-      const nx = Math.cos(rad2) * f, ny = Math.sin(rad2) * f;
-      // v6: projektives Sampling - affin wuerde bei Schraegsicht Winkel-Bins verschieben
-      const bp = normierraumZuBild(nx, ny, ncal);
-      const x = Math.round(bp.x), y = Math.round(bp.y);
-      if (x < 1 || y < 1 || x >= W - 1 || y >= H - 1) continue;
-      const i = (y * W + x) * 4;
-      if (istRotPx(D[i], D[i + 1], D[i + 2])) binRot[Math.round(t / 18) % 20]++;
-      else if (istGruenPx(D[i], D[i + 1], D[i + 2])) binGruen[Math.round(t / 18) % 20]++;
+    // v6.1: Radius-Integral statt fester Radien - Double-Band ist bei Schraegsicht
+    // oben nur ~3px breit, ein fester f-Punkt landet auf Bandkanten/Antialiasing
+    for (const [f0, f1] of [[0.55, 0.64], [0.91, 1.0]]) {
+      let hit = null;
+      for (let f = f0; f <= f1; f += 0.02) {
+        const nx = Math.cos(rad2) * f, ny = Math.sin(rad2) * f;
+        // v6: projektives Sampling - affin wuerde bei Schraegsicht Winkel-Bins verschieben
+        const bp = normierraumZuBild(nx, ny, ncal);
+        const x = Math.round(bp.x), y = Math.round(bp.y);
+        if (x < 1 || y < 1 || x >= W - 1 || y >= H - 1) continue;
+        const i = (y * W + x) * 4;
+        if (istRotPx(D[i], D[i + 1], D[i + 2])) { hit = 'r'; break; }
+        if (istGruenPx(D[i], D[i + 1], D[i + 2])) { hit = 'g'; break; }
+      }
+      if (hit === 'r') binRot[Math.round(t / 18) % 20]++;
+      else if (hit === 'g') binGruen[Math.round(t / 18) % 20]++;
     }
   }
   let wechsel = 0;

@@ -7,6 +7,7 @@
 - autoKalibriere (camera.js): medAng() zirkularer Median für rot, h-Median über ≥2 Frames, resolve jetzt mit rx/ry/theta/rot/h/qualitaet (vorher verworfen).
 - TDZ-FALLE: Destrukturierung [h,sv,vv]=rgb2hsv() shadowte früheres h im selben Block → TDZ-ReferenceError, node --check findet das NICHT. Umbenannt zu [hsv,sv,vv].
 - E2E (scripts/e2e-homographie.mjs, perspektivisch geneigtes Mock-Board psi=0.22/phi=0.60): 6/6 GRÜN - q=91, cal.h 3×3, rx=353/ry=278/theta=0.122, rot=1°, Bull-Punkt err 15.5px, T20-Mitte→T20 projektiv (affin wäre OK gewesen, projektiv jetzt auch bei stärkerer Schrägsicht korrekt).
+- NACHGERÜSTET (gleicher Tag, Deploy 1.0.1792935641): (a) alternanz-Sampling als Radius-Integral (f 0.55-0.64 und 0.91-1.0, Schritt 0.02, erste Farbklassifikation gewinnt) - Double-Band ist bei Schrägsicht oben nur ~3px breit, feste Radien landeten auf Bandkanten. (b) bullM-Score zählt ROT im Frei-Ring mit: um Triple-Grün liegt zwingend Rot benachbart (Sektoren alternieren im Band), um den 25er-Ring nicht (Rot erst ab 0.527r). Ergebnis: q=94-100 und Mp-Fehler 3-8px über den GESAMTEN Tilt-Bereich 13-29° (vorher K.O. ab 17°, Mp bis 37px daneben). Suite 184 Tests grün, E2E 6/6.
 - Suite 24 Dateien / 184 Tests grün. Deploy 1.0.1792932780.
 
 ## 2026-10-25 Zoom-Fix (WebView) + Echtheits-Gate (Auto-Kalibrierung)
