@@ -64,6 +64,29 @@ function frameGrab() {
 // Diff: neuen dunklen Punkt finden (Pfeilspitze). Liefert {x, y, staerke} oder null.
 export function findeNeuenPfeil(a, b) { setEngineCal(cal); return _finde(a, b, cal); }
 
+// ===== WEBVIEW-SICHERER ZOOM =====
+// Android-WebView rendert <video> als eigene Surface: transform:scale(<1)
+// laesst das Bild ploetzlich verschwinden. Deshalb Zoom <= 1x per LAYOUT
+// (width%), transform nur noch fuer Zoom > 1x (Pinch-typisch, robust).
+export function setzeAnsichtsZoom(v, z) {
+  if (!v) return;
+  if (z <= 1) {
+    v.style.transform = 'none';
+    v.style.width = Math.round(z * 100) + '%';
+    v.style.marginLeft = 'auto'; v.style.marginRight = 'auto';
+  } else {
+    v.style.width = '100%';
+    v.style.marginLeft = '0'; v.style.marginRight = '0';
+    v.style.transform = `scale(${z})`;
+    v.style.transformOrigin = 'center center';
+  }
+}
+// Wirksamer Transform-Faktor fuer Klick-Mapping (1 bei Layout-Zoom).
+export function leseAnsichtsZoom(v) {
+  if (!v || !v.style.transform || v.style.transform === 'none') return 1;
+  return parseFloat(v.style.transform.replace(/[^\d.]/g, '')) || 1;
+}
+
 // ===== MAXIMALE KAMERA-OPTIMIERUNG (nur Handy-Cam) =====
 // 1) 1920er-Stream erzwingen, 30fps
 // 2) Fokus beruhigen (continuous-video statt Foto-Pumpen)
@@ -213,11 +236,11 @@ export function mountCam(host, onThrow, onStatus) {
   const zoomLabel = el('span', { class: 'small muted', style: 'float:right' }, '0,5x');
   const zoom = el('input', { type: 'range', min: 30, max: 500, value: 50, step: 5, style: 'width:100%;margin:6px 0 0' });
   
-  zoom.oninput = () => { v.style.transform = `scale(${zoom.value / 100})`; zoomLabel.textContent = (zoom.value / 100).toFixed(1).replace('.', ',') + 'x'; };
+  zoom.oninput = () => { setzeAnsichtsZoom(v, zoom.value / 100); zoomLabel.textContent = (zoom.value / 100).toFixed(1).replace('.', ',') + 'x'; };
   const note = el('div', { class: 'small muted', style: 'text-align:center;margin-top:2px;font-size:10.5px;line-height:1.25' }, 'Kamera startet…');
   frame.append(v);
   // KAY: Ansicht startet IMMER weit draussen (0,5x) - dann gezielt reinzoomen
-  zoom.value = 50; zoomLabel.textContent = '0,5x'; v.style.transform = 'scale(0.5)';
+  zoom.value = 50; zoomLabel.textContent = '0,5x'; setzeAnsichtsZoom(v, 0.5);
   const zoomRow = el('div', {}, zoomLabel);
   host.append(frame, zoomRow, zoom, note);
   video = v; // Modul-Referenz fuer frameGrab/startAuto
@@ -225,7 +248,7 @@ export function mountCam(host, onThrow, onStatus) {
   v.onclick = async (ev) => {
     if (phase.mode === 'kalib-bull' || phase.mode === 'kalib-rand') {
       const rect = v.getBoundingClientRect();
-      const zoom = v.style.transform ? (parseFloat(v.style.transform.replace(/[^\d.]/g, '')) || 1) : 1;
+      const zoom = leseAnsichtsZoom(v);
       const lx = (ev.clientX - rect.left) / zoom, ly = (ev.clientY - rect.top) / zoom;
       const sc = Math.min(v.offsetWidth / (v.videoWidth || v.offsetWidth), v.offsetHeight / (v.videoHeight || v.offsetHeight));
       const offX = (v.offsetWidth - (v.videoWidth || v.offsetWidth) * sc) / 2;
@@ -248,7 +271,7 @@ export function mountCam(host, onThrow, onStatus) {
     // ZOOM-SICHER (wie tapEingabe): offset-Masse + entzoomen vor contain-Mapping
     const ow = v.offsetWidth || v.videoWidth, oh = v.offsetHeight || v.videoHeight;
     const rect = v.getBoundingClientRect();
-    const zoom = v.style.transform ? (parseFloat(v.style.transform.replace(/[^\d.]/g, '')) || 1) : 1;
+    const zoom = leseAnsichtsZoom(v);
     const lx = (ev.clientX - rect.left) / zoom;
     const ly = (ev.clientY - rect.top) / zoom;
     const sc = Math.min(ow / (v.videoWidth || ow), oh / (v.videoHeight || oh));
@@ -289,7 +312,7 @@ export function tapEingabeAnbinden(videoEl, onThrow, onKalibHinweis) {
     if (!cal) { if (onKalibHinweis) onKalibHinweis(); return; }
     // BEWIESENE Core-Kette (tests/tap-kette.test.js): Finger -> Video -> Feld
     const rect = videoEl.getBoundingClientRect();
-    const zoom = videoEl.style.transform ? (parseFloat(videoEl.style.transform.replace(/[^\d.]/g, '')) || 1) : 1;
+    const zoom = leseAnsichtsZoom(videoEl);
     const p = _tapZuVideoPixel(ev.clientX, ev.clientY, rect.left, rect.top, rect.width, rect.height,
       videoEl.offsetWidth || videoEl.videoWidth, videoEl.offsetHeight || videoEl.videoHeight,
       videoEl.videoWidth || 1, videoEl.videoHeight || 1, zoom);
@@ -457,9 +480,7 @@ export function renderCamera(view) {
   };
 
   zoom.oninput = () => {
-    const z = zoom.value / 100;
-    video.style.transform = `scale(${z})`;
-    video.style.transformOrigin = 'center';
+    setzeAnsichtsZoom(video, zoom.value / 100);
   };
 
   const host = el('div', { style: 'position:relative;display:block' }, video, overlay);
@@ -487,15 +508,18 @@ export function autoKalibriere(videoEl, onProgress) {
         c.getContext('2d', { willReadFrequently: true }).drawImage(videoEl, 0, 0, zielW, c.height);
         const data = c.getContext('2d').getImageData(0, 0, zielW, c.height);
         const e = analyseBoardInFrame(data);
-        if (e && e.r > 25 && e.r < zielW * 0.75) ergs.push(e);
+        // QUALITAETS-GATE: nur echte Boards akzeptieren (kein TV / Wand / Rauschen)
+        const q = e && typeof e.qualitaet === 'number' ? e.qualitaet : 0;
+        if (e && q >= 60 && e.r > 25 && e.r < zielW * 0.75) ergs.push(e);
       } catch (err) { /* Frame-Drop */ }
       if (onProgress) { try { onProgress(Math.round((f + 1) / 5 * 100), ergs.length); } catch (_) {} }
       await new Promise(r => setTimeout(r, 250));
     }
     if (ergs.length < 3) { resolve(null); return; }
+    const qs = ergs.map(e => e.qualitaet || 0);
     const med = (arr, key) => { const v = arr.map(e => e[key]).sort((a, b) => a - b); return v[Math.floor(v.length / 2)]; };
     const skal = videoEl.videoWidth / 270;
-    resolve({ cx: med(ergs, 'cx') * skal, cy: med(ergs, 'cy') * skal, r: med(ergs, 'r') * skal });
+    resolve({ cx: med(ergs, 'cx') * skal, cy: med(ergs, 'cy') * skal, r: med(ergs, 'r') * skal, qualitaet: qs.sort((a, b) => a - b)[Math.floor(qs.length / 2)] });
   });
 }
 
@@ -507,7 +531,7 @@ function zeichneRaster(videoEl, calErg) {
   c.width = box.width; c.height = box.height;
   const ctx = c.getContext('2d');
   const ow = videoEl.offsetWidth, oh = videoEl.offsetHeight;
-  const zoom = videoEl.style.transform ? (parseFloat(videoEl.style.transform.replace(/[^\d.]/g, '')) || 1) : 1;
+  const zoom = leseAnsichtsZoom(videoEl);
   const sc = Math.min(ow / videoEl.videoWidth, oh / videoEl.videoHeight) * zoom;
   const vx = (box.width - videoEl.videoWidth * sc) / 2, vy = (box.height - videoEl.videoHeight * sc) / 2;
   ctx.clearRect(0, 0, c.width, c.height);

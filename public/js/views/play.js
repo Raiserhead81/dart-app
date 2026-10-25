@@ -16,7 +16,7 @@ import { turnHoldMs } from '/js/core/turnhold.js';
 import { padThrow, padSpecial, pushSnapshot, popSnapshot, checkoutLine, HAPTIC } from '/js/core/pad.js';
 import { activePlayer, store, rerender } from '/js/app.js';
 import { cricketMarksTable } from '/js/views/cricket-ui.js';
-import { mountCam, unmountCam, toggleAufnahme, tapEingabeAnbinden, autoKalibriere } from '/js/views/camera.js';
+import { mountCam, unmountCam, toggleAufnahme, tapEingabeAnbinden, autoKalibriere, leseAnsichtsZoom } from '/js/views/camera.js';
 import { saveCal, setCal, camCalRef } from '/js/views/camera.js';
 
 const STARTS = [101, 170, 301, 501, 701, 1001];
@@ -615,7 +615,7 @@ function zeichneBoardOverlay(videoEl, cal) {
   c.width = box.width; c.height = box.height;
   const ctx = c.getContext('2d');
   const ow = videoEl.offsetWidth, oh = videoEl.offsetHeight;
-  const zoom = videoEl.style.transform ? (parseFloat(videoEl.style.transform.replace(/[^\d.]/g, '')) || 1) : 1;
+  const zoom = leseAnsichtsZoom(videoEl);
   const sc = Math.min(ow / videoEl.videoWidth, oh / videoEl.videoHeight);
   const dispScale = sc * zoom;
   const vx = (ow - videoEl.videoWidth * sc) / 2 * zoom + (box.width - ow * zoom) / 2;

@@ -1,5 +1,14 @@
 # NOTIZEN dart-app
 
+## 2026-10-25 Zoom-Fix (WebView) + Echtheits-Gate (Auto-Kalibrierung)
+- ZOOM-BUG (Kay: "Zoom-Regler nach links -> verschwindet ploetzlich"): Ursache ist Android-WebView - <video> wird als eigene Surface gerendert, transform:scale(<1) kippt das Compositing, Bild verschwindet schlagartig. Desktop-Chrome/Headless-Playwright zeigt das NICHT (dort nur kontinuierliches Schrumpfen).
+- FIX: Zoom <= 1x jetzt per LAYOUT (width:% + margin:auto, zentriert), transform nur noch fuer Zoom > 1x. Gemeinsame Helfer in camera.js: setzeAnsichtsZoom(v,z) / leseAnsichtsZoom(v). Umgestellt: profile.js-Slider, camera.js mountCam-Slider (Standard 0,5x), Kamera-Assistent, alle Klick-Mappings (Tap-Kalibrierung, manuelle Kalibrierung, zeichneRaster, play.js-Overlay) nutzen leseAnsichtsZoom (bei Layout-Zoom = 1, contain-Mapping stimmt automatisch).
+- E2E-Beweis (scripts/e2e-zoom-slider.mjs): val 80..30 -> videoTransform bleibt "none", Video schrumpft 342x192 -> 103x58 px, Slider permanent sichtbar.
+- ECHTHEITS-CHECK in analyseBoardInFrame (src/camera-engine.js): qualitaet 0-100 = Ringstruktur(40)+Alternanz(30)+dunkler Rand(15)+Farb-Balance(15); K.O.-Cap 45 bei (ring<0.5 UND alt<0.65) ODER randDunkel<0.08. autoKalibriere akzeptiert nur Frames mit qualitaet>=60 (kein "Kalibriert!" mehr auf Fernseher/Wand), Median-Qualitaet steht im Ergebnis.
+- Grenzen dokumentiert: sehr dunkel (Faktor ~0.3-0.55 + Rauschen) -> Radius-Schaetzung kippt (r zu gross), Auto lehnt ab -> Torch an oder heller stellen oder Tap-Fallback (window.__manuellKalib). Tests (tests/board-echtheit.test.js, 8 Tests) sichern genau das.
+- 404 im E2E = /favicon.ico (Chrome-Anfrage trotz link rel=icon; Icons selbst 200) - kosmetisch, ignoriert.
+- Suite: 23 Dateien / 177 Tests gruen; Deploy 1.0.1792927571.
+
 ## 2026-10-23 Caller-Umbau (Kay)
 - KEINE Einzel-Dart-Ansage mehr im Solo-Spiel (play.js) und Online-Match (onlinematch.js); Caller spricht erst am Visit-Ende (3. Dart) die SUMME (sc-Clip, 100..179 = euphorischer visit-Clip, 180 = ph-180).
 - 1+5+20 im Visit (Reihenfolge egal) => "GAAAY!!" statt Summe (ph-gay).

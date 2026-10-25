@@ -142,13 +142,12 @@ export function analyseBoardInFrame(img) {
   const istRotPx = (r, g, b) => { const [h, sv, vv] = rgb2hsv(r * 255 / maxR, g * 255 / maxG, b * 255 / maxB); return (h < 25 || h > 335) && sv > 0.30 && vv > 0.15; };
   const istGruenPx = (r, g, b) => { const [h, sv, vv] = rgb2hsv(r * 255 / maxR, g * 255 / maxG, b * 255 / maxB); return h > 80 && h < 165 && sv > 0.22 && vv > 0.12; };
   const punkte = [];
-  let sx = 0, sy = 0, n = 0;
+  let sx = 0, sy = 0, n = 0, rotN = 0, gruenN = 0;
   for (let y = 2; y < H - 2; y += 1) {
     for (let x = 2; x < W - 2; x += 1) {
       const i = (y * W + x) * 4;
-      if (istRotPx(D[i], D[i + 1], D[i + 2]) || istGruenPx(D[i], D[i + 1], D[i + 2])) {
-        punkte.push([x, y]); sx += x; sy += y; n++;
-      }
+      if (istRotPx(D[i], D[i + 1], D[i + 2])) { punkte.push([x, y]); sx += x; sy += y; n++; rotN++; }
+      else if (istGruenPx(D[i], D[i + 1], D[i + 2])) { punkte.push([x, y]); sx += x; sy += y; n++; gruenN++; }
     }
   }
   if (n < 40) return null;
@@ -235,7 +234,63 @@ export function analyseBoardInFrame(img) {
   }
   rot = -rot; // Vorzeichen: positive Zahl = Board im Uhrzeigersinn gedreht
   if (bestScore < 60) rot = 0; // zu schwaches Signal: Kamera als gerade annehmen
-  return { cx, cy, r, rx: ellipse ? ellipse.rx : r, ry: ellipse ? ellipse.ry : r, theta: ellipse ? ellipse.theta : 0, aspekt: ellipse ? ellipse.aspekt : 1, rot, n, strahlen: rand.length };
+
+  // ===== ECHTHEITS-CHECK: Dartscheibe oder Fremdbild (TV/Foto/Wand)? =====
+  // Echte Scheibe: Farben NUR in Triple-Band (0.45-0.68) + Double-Band (0.88-1.05),
+  // 20-fache rot/gruen-Alternanz, dunkle Board-Umrandung ausserhalb, Balance ~50/50.
+  const ncal = { cx, cy, rx: ellipse ? ellipse.rx : r, ry: ellipse ? ellipse.ry : r, theta: ellipse ? ellipse.theta : 0 };
+  let inBand = 0;
+  for (const p of punkte) {
+    const q = inNormierraum(p[0], p[1], ncal);
+    const pr = Math.hypot(q.u, q.v);
+    if ((pr >= 0.45 && pr <= 0.68) || (pr >= 0.88 && pr <= 1.05)) inBand++;
+  }
+  const ringAnteil = n ? inBand / n : 0;
+  const NX = ncal.rx, NY = ncal.ry, NTH = ncal.theta;
+  const binRot = new Array(20).fill(0), binGruen = new Array(20).fill(0);
+  for (let t = 0; t < 360; t += 3) {
+    const rad2 = (t - 90) * Math.PI / 180;
+    for (const f of [0.58, 0.96]) {
+      const nx = Math.cos(rad2) * f, ny = Math.sin(rad2) * f;
+      const x = Math.round(cx + (nx * NX * Math.cos(NTH) - ny * NY * Math.sin(NTH)));
+      const y = Math.round(cy + (nx * NX * Math.sin(NTH) + ny * NY * Math.cos(NTH)));
+      if (x < 1 || y < 1 || x >= W - 1 || y >= H - 1) continue;
+      const i = (y * W + x) * 4;
+      if (istRotPx(D[i], D[i + 1], D[i + 2])) binRot[Math.round(t / 18) % 20]++;
+      else if (istGruenPx(D[i], D[i + 1], D[i + 2])) binGruen[Math.round(t / 18) % 20]++;
+    }
+  }
+  let wechsel = 0;
+  const cols = [];
+  for (let k = 0; k < 20; k++) {
+    const tot = binRot[k] + binGruen[k];
+    cols.push(tot ? (binRot[k] >= binGruen[k] ? 1 : 0) : null);
+  }
+  for (let k = 0; k < 20; k++) {
+    if (cols[k] !== null && cols[(k + 1) % 20] !== null && cols[k] !== cols[(k + 1) % 20]) wechsel++;
+  }
+  const alternanz = wechsel / 20;
+  let dunkel = 0, randN = 0;
+  for (let t = 0; t < 360; t += 10) {
+    const rad2 = (t - 90) * Math.PI / 180;
+    for (const f of [1.06, 1.12, 1.18]) {
+      const nx = Math.cos(rad2) * f, ny = Math.sin(rad2) * f;
+      const x = Math.round(cx + (nx * NX * Math.cos(NTH) - ny * NY * Math.sin(NTH)));
+      const y = Math.round(cy + (nx * NX * Math.sin(NTH) + ny * NY * Math.cos(NTH)));
+      if (x < 1 || y < 1 || x >= W - 1 || y >= H - 1) continue;
+      const i = (y * W + x) * 4;
+      const grauN = ((D[i] + D[i + 1] + D[i + 2]) / 3) * 255 / maxGrau;
+      if (grauN < 60) dunkel++;
+      randN++;
+    }
+  }
+  const randDunkel = randN ? dunkel / randN : 0;
+  const farbSumme = rotN + gruenN;
+  const balance = farbSumme ? Math.min(rotN, gruenN) / farbSumme : 0;
+  let qualitaet = Math.min(1, ringAnteil / 0.75) * 40 + alternanz * 30 + randDunkel * 15 + Math.min(1, balance / 0.42) * 15;
+  // K.O.: weder Ringstruktur noch Sektorwechsel => kein Board, egal wie der Rest aussieht
+  if ((ringAnteil < 0.5 && alternanz < 0.65) || randDunkel < 0.08) qualitaet = Math.min(qualitaet, 45);
+  return { cx, cy, r, rx: ellipse ? ellipse.rx : r, ry: ellipse ? ellipse.ry : r, theta: ellipse ? ellipse.theta : 0, aspekt: ellipse ? ellipse.aspekt : 1, rot, n, strahlen: rand.length, qualitaet: Math.round(qualitaet), ringAnteil: +ringAnteil.toFixed(2), alternanz, randDunkel: +randDunkel.toFixed(2), balance: +balance.toFixed(2) };
 }
 
 

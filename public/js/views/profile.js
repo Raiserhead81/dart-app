@@ -5,7 +5,7 @@ import { el, icon, toast, download } from '/js/util.js';
 import { store, rerender } from '/js/app.js';
 import { configureCaller, callerSettings, unlockAudio } from '/js/caller-voice.js';
 import { startManualUpdateCheck } from '/js/update-manual.js';
-import { autoKalibriere, setCal, saveCal, camCalRef, setzeTorch } from '/js/views/camera.js';
+import { autoKalibriere, setCal, saveCal, camCalRef, setzeTorch, setzeAnsichtsZoom, leseAnsichtsZoom } from '/js/views/camera.js';
 
 export function renderProfile(view) {
   const s = store.state;
@@ -64,13 +64,13 @@ export function renderProfile(view) {
         // Zoom-Regler (rein/raus) unter dem Kamerabild
         const zoomLabel = el('span', { class: 'small muted', style: 'float:right' }, '1,0x');
         const zoom = el('input', { type: 'range', min: 30, max: 500, value: 100, step: 5, style: 'width:100%;margin:8px 0 0' });
-        zoom.oninput = () => { v.style.transform = `scale(${zoom.value / 100})`; zoomLabel.textContent = (zoom.value / 100).toFixed(1).replace('.', ',') + 'x'; };
+        zoom.oninput = () => { setzeAnsichtsZoom(v, zoom.value / 100); zoomLabel.textContent = (zoom.value / 100).toFixed(1).replace('.', ',') + 'x'; };
         videoHost.append(el('div', {}, zoomLabel), zoom);
         // Manuelle Kalibrier-Taps (falls Auto versagt): Bull, dann untere Doppelkante
         v.onclick = async (ev) => {
           if (phase !== 'kalib-bull' && phase !== 'kalib-rand') return;
           const rect = v.getBoundingClientRect();
-          const zoom = v.style.transform ? (parseFloat(v.style.transform.replace(/[^\d.]/g, '')) || 1) : 1;
+          const zoom = leseAnsichtsZoom(v);
           const lx = (ev.clientX - rect.left) / zoom, ly = (ev.clientY - rect.top) / zoom;
           const sc = Math.min(v.offsetWidth / (v.videoWidth || v.offsetWidth), v.offsetHeight / (v.videoHeight || v.offsetHeight));
           const px = (lx - (v.offsetWidth - (v.videoWidth || v.offsetWidth) * sc) / 2) / sc;
