@@ -369,7 +369,8 @@ export function analyseBoardInFrame(img) {
   const balance = farbSumme ? Math.min(rotN, gruenN) / farbSumme : 0;
   let qualitaet = Math.min(1, ringAnteil / 0.75) * 40 + alternanz * 30 + randDunkel * 15 + Math.min(1, balance / 0.42) * 15;
   // K.O.: weder Ringstruktur noch Sektorwechsel => kein Board, egal wie der Rest aussieht
-  if ((ringAnteil < 0.5 && alternanz < 0.65) || randDunkel < 0.08) qualitaet = Math.min(qualitaet, 45);
+  // (randDunkel-K.O. entfernt 25.10.: helle Wand/Tag = Rand nie dunkel => False Negative bei top Board-Daten)
+  if (ringAnteil < 0.5 && alternanz < 0.65) qualitaet = Math.min(qualitaet, 45);
   // v6: projektive Homographie aus Ellipse + Bull-Versatz (echte Schraegsicht-Korrektur)
   return { cx, cy, r, rx: ellipse ? ellipse.rx : r, ry: ellipse ? ellipse.ry : r, theta: ellipse ? ellipse.theta : 0, aspekt: ellipse ? ellipse.aspekt : 1, rot, n, strahlen: rand.length, qualitaet: Math.round(qualitaet), ringAnteil: +ringAnteil.toFixed(2), alternanz, randDunkel: +randDunkel.toFixed(2), balance: +balance.toFixed(2), h };
 }

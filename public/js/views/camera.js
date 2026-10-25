@@ -101,6 +101,10 @@ export async function optimiereKamera(track) {
 }
 export async function setzeTorch(track, an) {
   try {
+    // Capabilities pruefen: Android-WebView resolved applyConstraints teils OHNE Fehler,
+    // obwohl die Gerate-LED gar keine torch-Faehigkeit hat (stiller Scheinerfolg)
+    const caps = track && track.getCapabilities ? track.getCapabilities() : null;
+    if (!track || (caps && caps.torch !== true)) return false;
     await track.applyConstraints({ advanced: [{ torch: !!an }] });
     return true;
   } catch (e) { return false; }
@@ -264,6 +268,18 @@ export function mountCam(host, onThrow, onStatus) {
   zoom.oninput = () => { setzeAnsichtsZoom(v, zoom.value / 100); zoomLabel.textContent = (zoom.value / 100).toFixed(1).replace('.', ',') + 'x'; };
   const note = el('div', { class: 'small muted', style: 'text-align:center;margin-top:2px;font-size:10.5px;line-height:1.25' }, 'Kamera startet…');
   frame.append(v);
+  // KAY: TORCH auch im SPIEL - Handy-LED auf die Scheibe (bei dunkler Halle)
+  const torchBtn = el('button', { class: 'gbtn', style: 'position:absolute;top:8px;left:8px;z-index:5' }, '\uD83D\uDCA1 Blitz');
+  let torchAn = false;
+  torchBtn.onclick = async () => {
+    const t = kamerataste();
+    if (!t) { torchBtn.textContent = 'Kamera?'; return; }
+    torchAn = !torchAn;
+    const ok = await setzeTorch(t, torchAn);
+    torchBtn.textContent = ok ? (torchAn ? '\uD83D\uDCA1 AUS' : '\uD83D\uDCA1 Blitz') : 'kein Blitz';
+    if (!ok) torchAn = false;
+  };
+  frame.append(torchBtn);
   // KAY: Ansicht startet IMMER weit draussen (0,5x) - dann gezielt reinzoomen
   zoom.value = 50; zoomLabel.textContent = '0,5x'; setzeAnsichtsZoom(v, 0.5);
   const zoomRow = el('div', {}, zoomLabel);
