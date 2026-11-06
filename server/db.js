@@ -55,6 +55,14 @@ export function openDb(path) {
     CREATE INDEX IF NOT EXISTS idx_synced_owner ON synced_games(owner_id, date);
     CREATE INDEX IF NOT EXISTS idx_matches_owner ON matches(owner_id, status);
     CREATE INDEX IF NOT EXISTS idx_matches_guest ON matches(guest_id, status);
+    CREATE TABLE IF NOT EXISTS diag (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      ts INTEGER,
+      hell REAL, q REAL, r REAL, cx REAL, cy REAL, rx REAL, ry REAL, rot REAL,
+      cal TEXT,
+      info TEXT,
+      created_at TEXT NOT NULL
+    );
   `);
   return db;
 }

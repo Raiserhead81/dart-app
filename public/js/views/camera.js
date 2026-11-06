@@ -121,6 +121,7 @@ export async function startCam(deviceId) {
   if (stream) { // Stream laeuft evtl. schon (alter View) -> NEUES Video anbinden!
     video.srcObject = stream;
     try { await video.play(); } catch (e) {}
+    diagStart();
     return true;
   }
   // Ohne explizite deviceId: Weitwinkel-Linse per LABEL waehlen (IDs sind je Start neu!)
@@ -153,6 +154,7 @@ export async function startCam(deviceId) {
     video.srcObject = stream;
     await video.play();
     optimiereKamera(stream.getVideoTracks()[0]).catch(() => {});
+    diagStart(); // Live-Diagnose: sobald der Stream laeuft
     return true;
   } catch (e) {
     return false;
@@ -160,8 +162,69 @@ export async function startCam(deviceId) {
 }
 
 export function stopCam() {
+  diagStop();
   if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
 }
+
+// ===== STILLER LIVE-DIAGNOSE-SENDER (Kamera-Test ohne Kabel) =====
+// Alle 1.5s: frameGrab -> analyseBoardInFrame -> POST /api/diag. Fehler still
+// ignorieren, kein UI, kein Design. window.__diagSende fuer manuelle Tests.
+let diagTimer = null, diagBusy = false, diagLastPost = 0;
+function diagFrameKlein() {
+  const big = frameGrab();
+  if (!big || !big.width) return null;
+  // Engine-Raum wie oppo-diag/autoKalibriere: 270px breit
+  const zielW = 270;
+  const c = document.createElement('canvas');
+  c.width = zielW; c.height = Math.round(zielW * big.height / big.width);
+  const cc = c.getContext('2d', { willReadFrequently: true });
+  cc.drawImage(canvas, 0, 0, zielW, c.height); // canvas = frameGrab-Quelle (Modul-Var)
+  return cc.getImageData(0, 0, zielW, c.height);
+}
+async function diagSende() {
+  const data = diagFrameKlein();
+  if (!data) return null;
+  // Helligkeit wie scripts/oppo-diag.mjs: Stichprobe ueber Pixel
+  let hell = 0, n = 0;
+  for (let i = 0; i < data.data.length; i += 4 * 997) {
+    hell += (data.data[i] + data.data[i + 1] + data.data[i + 2]) / 3; n++;
+  }
+  const e = analyseBoardInFrame(data);
+  const payload = {
+    ts: Date.now(),
+    hell: n ? Math.round(hell / n) : null,
+    q: e ? Math.round(e.qualitaet || 0) : 0,
+    r: e ? Math.round(e.r || 0) : null,
+    cx: e ? Math.round(e.cx || 0) : null,
+    cy: e ? Math.round(e.cy || 0) : null,
+    rx: e ? Math.round(e.rx || 0) : null,
+    ry: e ? Math.round(e.ry || 0) : null,
+    rot: e ? Math.round(e.rot || 0) : null,
+    cal: cal ? { cx: Math.round(cal.cx), cy: Math.round(cal.cy), r: Math.round(cal.r) } : null,
+    info: (video && video.videoWidth) ? video.videoWidth + 'x' + video.videoHeight : ''
+  };
+  try {
+    await fetch('/api/diag', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  } catch (e2) { /* still */ }
+  return payload;
+}
+function diagStart() {
+  if (diagTimer) return;
+  diagTimer = setInterval(async () => {
+    if (diagBusy) return;
+    diagBusy = true;
+    try {
+      const now = Date.now();
+      if (now - diagLastPost >= 1400) { diagLastPost = now; await diagSende(); }
+    } catch (e) { /* still */ }
+    diagBusy = false;
+  }, 1500);
+}
+function diagStop() { if (diagTimer) { clearInterval(diagTimer); diagTimer = null; } }
+window.__diagSende = diagSende; // manueller Test (CDP/Konsole)
 
 // Kalibrierung speichern (Handy-Position vorausgesetzt)
 export function saveCal() { if (cal && store) { store.state.settings.cameraCal = cal; store.save(); } }

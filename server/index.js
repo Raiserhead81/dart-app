@@ -58,6 +58,35 @@ app.get('/api/health', (req, res) => {
   res.json({ ok: true, service: 'dartpro-api', time: new Date().toISOString() });
 });
 
+// ---------- Live-Diagnose (Kamera-Test ohne Kabel; kein Auth, max 1 Insert/s) ----------
+let diagLastInsert = 0;
+app.post('/api/diag', (req, res) => {
+  const now = Date.now();
+  if (now - diagLastInsert < 1000) return res.status(429).json({ error: 'max 1 Speicherung pro Sekunde' });
+  const b = req.body || {};
+  const num = v => (v == null || v === '' || isNaN(Number(v))) ? null : Number(v);
+  const info = db.prepare(`
+    INSERT INTO diag (ts, hell, q, r, cx, cy, rx, ry, rot, cal, info, created_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+  `).run(
+    num(b.ts) ?? now, num(b.hell), num(b.q), num(b.r), num(b.cx), num(b.cy),
+    num(b.rx), num(b.ry), num(b.rot),
+    b.cal == null ? null : JSON.stringify(b.cal).slice(0, 300),
+    String(b.info || '').slice(0, 500), new Date().toISOString()
+  );
+  diagLastInsert = now;
+  // Historie begrenzen: nur die letzten 200 Eintraege behalten
+  db.prepare('DELETE FROM diag WHERE id NOT IN (SELECT id FROM diag ORDER BY id DESC LIMIT 200)').run();
+  res.json({ ok: true, id: Number(info.lastInsertRowid) });
+});
+
+app.get('/api/diag/latest', (req, res) => {
+  const row = db.prepare('SELECT * FROM diag ORDER BY id DESC LIMIT 1').get();
+  if (!row) return res.json(null);
+  try { row.cal = row.cal ? JSON.parse(row.cal) : null; } catch (_) { row.cal = null; }
+  res.json(row);
+});
+
 // ---------- Auth ----------
 app.post('/api/auth/register', authLimit, (req, res) => {
   const name = String(req.body?.name || '').trim();

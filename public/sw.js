@@ -1,6 +1,6 @@
 // DartPro Service Worker: NETWORK-FIRST fuer App-Code/Navigation (nie cache-first!),
 // Caller-Clips + Icons: cache-first, Offline-Fallback: App-Shell.
-const VERSION = '1-0-1';
+const VERSION = '1-0-2';
 const SHELL = `dartpro-shell-${VERSION}`;
 const ASSETS = `dartpro-assets-${VERSION}`;
 
