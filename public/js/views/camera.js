@@ -120,7 +120,7 @@ export async function startCam(deviceId) {
   const gespeichertesLabel = (() => { try { return localStorage.getItem('dartpro.camera.lenslabel') || ''; } catch (e) { return ''; } })();
   if (stream) { // Stream laeuft evtl. schon (alter View) -> NEUES Video anbinden!
     video.srcObject = stream;
-    try { await video.play(); } catch (e) {}
+    try { await video.play(); } catch (e) { diagMeldung('CAM-ERR: play ' + ((e && e.message) || e)); }
     diagStart();
     return true;
   }
@@ -157,6 +157,8 @@ export async function startCam(deviceId) {
     diagStart(); // Live-Diagnose: sobald der Stream laeuft
     return true;
   } catch (e) {
+    // KAY: Kamera-Fehler LIVE melden (auch wenn kein Stream) - Handy-Test ohne Kabel
+    diagMeldung('CAM-ERR: ' + (e && e.message ? e.message : String(e)));
     return false;
   }
 }
@@ -169,7 +171,38 @@ export function stopCam() {
 // ===== STILLER LIVE-DIAGNOSE-SENDER (Kamera-Test ohne Kabel) =====
 // Alle 1.5s: frameGrab -> analyseBoardInFrame -> POST /api/diag. Fehler still
 // ignorieren, kein UI, kein Design. window.__diagSende fuer manuelle Tests.
-let diagTimer = null, diagBusy = false, diagLastPost = 0;
+let diagTimer = null, diagBusy = false, diagLastPost = 0, diagLastImgTs = 0;
+
+// Route/Kontext fuer info-Feld (Hash oder __dartRoute, max 40 Zeichen)
+function diagRouteInfo() {
+  try {
+    const r = String(window.__dartRoute || location.hash || '').slice(0, 40);
+    return r ? ',' + r : '';
+  } catch (e) { return ''; }
+}
+// Einmal-Meldung an /api/diag (Fehlerkanal), still - auch ohne Stream
+function diagMeldung(info) {
+  try {
+    fetch('/api/diag', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ts: Date.now(), info: String(info).slice(0, 480) + diagRouteInfo() })
+    }).catch(() => {});
+  } catch (e) { /* still */ }
+}
+// JPEG-Thumbnail 360px breit aus dem Live-Video, base64 OHNE data:-Prefix.
+// Ziel < 60KB, sonst Qualitaet schrittweise senken.
+function diagThumb() {
+  try {
+    if (!video || !video.videoWidth) return null;
+    const w = 360, h = Math.max(1, Math.round(w * (video.videoHeight || 1) / video.videoWidth));
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    c.getContext('2d').drawImage(video, 0, 0, w, h);
+    let q = 0.55, s = c.toDataURL('image/jpeg', q);
+    while (s.length > 60000 && q > 0.2) { q -= 0.1; s = c.toDataURL('image/jpeg', q); }
+    return s.slice(s.indexOf(',') + 1);
+  } catch (e) { return null; }
+}
 function diagFrameKlein() {
   const big = frameGrab();
   if (!big || !big.width) return null;
@@ -201,8 +234,14 @@ async function diagSende() {
     ry: e ? Math.round(e.ry || 0) : null,
     rot: e ? Math.round(e.rot || 0) : null,
     cal: cal ? { cx: Math.round(cal.cx), cy: Math.round(cal.cy), r: Math.round(cal.r) } : null,
-    info: (video && video.videoWidth) ? video.videoWidth + 'x' + video.videoHeight : ''
+    info: ((video && video.videoWidth) ? video.videoWidth + 'x' + video.videoHeight : '') + diagRouteInfo()
   };
+  // KAY: alle 5s ein JPEG-Thumbnail mit ins POST (Kamerabild remote SEHEN)
+  const jetzt = Date.now();
+  if (jetzt - diagLastImgTs >= 5000) {
+    const thumb = diagThumb();
+    if (thumb) { payload.img = thumb; diagLastImgTs = jetzt; }
+  }
   try {
     await fetch('/api/diag', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -225,6 +264,27 @@ function diagStart() {
 }
 function diagStop() { if (diagTimer) { clearInterval(diagTimer); diagTimer = null; } }
 window.__diagSende = diagSende; // manueller Test (CDP/Konsole)
+
+// KAY: GLOBALER JS-Fehlerkanal (einmalig): error + unhandledrejection ->
+// diag-POST, gedrosselt max 1 Meldung pro 20s, komplett still.
+if (!window.__diagErrHook) {
+  window.__diagErrHook = true;
+  let diagLastErrTs = 0;
+  const diagJsErr = (msg, datei, zeile) => {
+    try {
+      const jetzt = Date.now();
+      if (jetzt - diagLastErrTs < 20000) return;
+      diagLastErrTs = jetzt;
+      const d = String(datei || '').split('/').pop().slice(0, 60);
+      diagMeldung('JS-ERR: ' + String(msg || 'unbekannt').slice(0, 300) + ' @' + d + ':' + (zeile || '?'));
+    } catch (e) { /* still */ }
+  };
+  window.addEventListener('error', (ev) => diagJsErr(
+    (ev && (ev.message || (ev.error && ev.error.message))) || 'unbekannt',
+    ev && ev.filename, ev && ev.lineno));
+  window.addEventListener('unhandledrejection', (ev) => diagJsErr(
+    (ev && ev.reason && (ev.reason.message || String(ev.reason))) || 'unbekannt', '', ''));
+}
 
 // Kalibrierung speichern (Handy-Position vorausgesetzt)
 export function saveCal() { if (cal && store) { store.state.settings.cameraCal = cal; store.save(); } }

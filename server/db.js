@@ -61,8 +61,11 @@ export function openDb(path) {
       hell REAL, q REAL, r REAL, cx REAL, cy REAL, rx REAL, ry REAL, rot REAL,
       cal TEXT,
       info TEXT,
+      img TEXT,
       created_at TEXT NOT NULL
     );
   `);
+  // Bestehende diag-Tabelle nachrusten (Fehler = Spalte existiert schon, ignorieren)
+  try { db.exec('ALTER TABLE diag ADD COLUMN img TEXT'); } catch (e) {}
   return db;
 }

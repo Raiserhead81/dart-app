@@ -66,13 +66,15 @@ app.post('/api/diag', (req, res) => {
   const b = req.body || {};
   const num = v => (v == null || v === '' || isNaN(Number(v))) ? null : Number(v);
   const info = db.prepare(`
-    INSERT INTO diag (ts, hell, q, r, cx, cy, rx, ry, rot, cal, info, created_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+    INSERT INTO diag (ts, hell, q, r, cx, cy, rx, ry, rot, cal, info, img, created_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
   `).run(
     num(b.ts) ?? now, num(b.hell), num(b.q), num(b.r), num(b.cx), num(b.cy),
     num(b.rx), num(b.ry), num(b.rot),
     b.cal == null ? null : JSON.stringify(b.cal).slice(0, 300),
-    String(b.info || '').slice(0, 500), new Date().toISOString()
+    String(b.info || '').slice(0, 500),
+    b.img == null ? null : String(b.img).slice(0, 100000),
+    new Date().toISOString()
   );
   diagLastInsert = now;
   // Historie begrenzen: nur die letzten 200 Eintraege behalten
@@ -85,6 +87,18 @@ app.get('/api/diag/latest', (req, res) => {
   if (!row) return res.json(null);
   try { row.cal = row.cal ? JSON.parse(row.cal) : null; } catch (_) { row.cal = null; }
   res.json(row);
+});
+
+// Letztes Diagnose-Bild als echtes JPEG (Kamerabild remote ansehen)
+app.get('/api/diag/img', (req, res) => {
+  const row = db.prepare('SELECT img FROM diag WHERE img IS NOT NULL ORDER BY id DESC LIMIT 1').get();
+  if (!row || !row.img) return res.status(404).json({ error: 'kein diag-bild vorhanden' });
+  try {
+    const buf = Buffer.from(row.img, 'base64');
+    res.set('Content-Type', 'image/jpeg');
+    res.set('Cache-Control', 'no-store');
+    res.send(buf);
+  } catch (e) { res.status(404).json({ error: 'img nicht dekodierbar' }); }
 });
 
 // ---------- Auth ----------

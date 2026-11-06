@@ -15,3 +15,12 @@
 
 ## Offen (echtes Geraet)
 - Live-Rotation am Stativ-Handy: folgt, sobald Kay die App am Stativ oeffnet (Zweck dieses Features)
+
+## Runde 2: Bild-Upload + Fehlerkanal (GLM-Reviewer-Beweise)
+- node --check camera.js/index.js/db.js: OK (module-mode)
+- Lokaler Smoke (In-Memory-DB): POST ok, /api/diag/img 200 image/jpeg
+- Live: POST {"ok":true,"id":79}; GET /api/diag/img -> 200 image/jpeg, file: JPEG 1x1 (/tmp/d.jpg 188B)
+- GET /api/diag/latest -> info 'CAM-ERR: NotAllowedError handy-test' sichtbar (Fehlerkanal bewiesen)
+- systemctl is-active dart-app-api: active; camera.js live 200 (5 grep-Treffer diagThumb/JS-ERR/CAM-ERR); sw.js live 1-0-3
+- Privacy: /api/diag* bewusst UNAUTHENTIFIZIERT fuer die Test-Phase (nur Diagnosewerte + 360px-Thumbs); nach Test-Ende sperren/entfernen -> in NOTIZEN.md aufgenommen
+- Live-Erkenntnis Stativ-Test 17:07-17:09: r=195 unter Gate nach Zurueckziehen OK, q max 27 (zu schwach), hell ~62-136 pendelnd, Daten stoppten 17:09:30 (App-Ansicht gewechselt/gross), Chrome-Kamerastart offen (CAM-ERR-Kanal greift morgen)
