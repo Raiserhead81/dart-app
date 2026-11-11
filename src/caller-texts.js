@@ -78,6 +78,9 @@ export function buildCallerSentences() {
   // (Claudio... nein: Gemini-Stimme Charon, strikte Prompts, von Kay abgehört+abgesegnet)
   out['en/ph-gay'] = 'GAAAY!!';
   out['de/ph-gay'] = 'GAAAY!!';
+  // KAY 11.11.: T20 + 5 + 1 = "GAAAY WITH FRIENDS!!" (Triples unter Freunden)
+  out['en/ph-gay-friends'] = 'GAAAY WITH FRIENDS!!';
+  out['de/ph-gay-friends'] = 'GAAAY WITH FRIENDS!!';
   out['en/ph-low-1'] = 'You call that darts?! Appalling!';
   out['en/ph-low-2'] = 'Absolutely dreadful!';
   out['en/ph-low-3'] = 'Shocking! Simply shocking!';

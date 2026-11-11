@@ -9,8 +9,20 @@ describe('Caller-Sequenz (Kays Timing)', () => {
   });
 
   it('Summe unter 100: sc-<points>-Clip', () => {
-    const seq = visitSequence({ labels: ['t20', 's1', 's5'], rest: 455, points: 66 });
-    expect(seq.map(s => s.clipId)).toEqual(['sc-66', 'rest-455']);
+    const seq = visitSequence({ labels: ['s20', 's19', 's18'], rest: 444, points: 57 });
+    expect(seq.map(s => s.clipId)).toEqual(['sc-57', 'rest-444']);
+  });
+
+  it('KAY 11.11.: T20+5+1 in beliebiger Reihenfolge = GAAAY WITH FRIENDS statt Summe', () => {
+    for (const labels of [['t20', 's1', 's5'], ['s5', 't20', 's1'], ['s1', 's5', 't20']]) {
+      const seq = visitSequence({ labels, rest: 435, points: 66 });
+      expect(seq.map(s => s.clipId)).toEqual(['ph-gay-friends', 'rest-435']);
+    }
+  });
+
+  it('KAY 11.11.: T20+5+1 = GAAAY WITH FRIENDS AUCH beim Bust', () => {
+    const seq = visitSequence({ labels: ['t20', 's1', 's5'], rest: 5, bust: true, points: 0 });
+    expect(seq.map(s => s.clipId)).toEqual(['ph-gay-friends', 'rest-5']);
   });
 
   it('KAY: 1+5+20 in beliebiger Reihenfolge = GAAAY statt Summe', () => {

@@ -20,6 +20,9 @@ export function visitSequence(visit, checkoutClipId = null) {
   // Double-In ohne Start-Doppel: KLARE Ansage statt lapidarem 'No score'.
   if (isGayVisit(labels)) {
     seq.push({ clipId: 'ph-gay', gapBeforeMs: 0 });
+  } else if (isGayFriendsVisit(labels)) {
+    // KAY 11.11.: T20 + 5 + 1 (Reihenfolge egal) = "GAAAY WITH FRIENDS!!"
+    seq.push({ clipId: 'ph-gay-friends', gapBeforeMs: 0 });
   } else if (noin) {
     seq.push({ clipId: 'ph-din', gapBeforeMs: 0 });
   } else if (visit180) {
@@ -42,6 +45,11 @@ export function visitSequence(visit, checkoutClipId = null) {
 // KAY: 1, 5 UND 20 im selben Visit (Reihenfolge egal) => "GAAAY!!" statt Summe
 export function isGayVisit(labels = []) {
   return [...labels].slice(0, 3).sort().join(',') === 's1,s20,s5';
+}
+
+// KAY 11.11.: TRIPLE 20 + 5 + 1 im selben Visit => "GAAAY WITH FRIENDS!!"
+export function isGayFriendsVisit(labels = []) {
+  return [...labels].slice(0, 3).sort().join(',') === 's1,s5,t20';
 }
 
 // End-Moment: Game Shot (+ Legstand), Match: + "Game, set and match" + laengerer Applaus.

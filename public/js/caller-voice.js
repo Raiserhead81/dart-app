@@ -411,6 +411,7 @@ function textForClipId(id) {
   if (id === 'ph-180') return 'One hundred and eighty!';
   if (id === 'ph-din') return settings.lang === 'de' ? 'BUST! Du brauchst ein Doppel zum Start!' : 'BUST! You need a double to start!';
   if (id === 'ph-gay') return 'GAAAY!!';
+  if (id === 'ph-gay-friends') return 'GAAAY WITH FRIENDS!!';
   if ((m = id.match(/^ph-low-([1-5])$/))) {
     const LOW_EN = ['You call that darts?! Appalling!', 'Absolutely dreadful!', 'Shocking! Simply shocking!', 'Embarrassing. Truly embarrassing!', 'My grandmother throws better than you!'];
     const LOW_DE = ['Das soll Darts sein?! Grauenhaft!', 'Absolut grausig!', 'Schockierend! Einfach schockierend!', 'Peinlich. Wirklich peinlich!', 'Meine Oma wirft besser als du!'];
@@ -430,7 +431,7 @@ function textForClipId(id) {
 // KAY-FUN (gay + Trash-Talk): Clips wurden per Gemini-TTS generiert und liegen in
 // den Sets. FALLBACK-Regel: Fehlt der Clip in einem Set (404/missing), spricht die
 // GERAETSTIMME den Text — bewusste Ausnahme vom Stimm-Mix-Verbot, nie Stille.
-const FUN_TTS = /^(ph-gay|ph-low-[1-5]|ph-din|ph-bust)$/; // ph-bust: bis BUST-Clips generiert sind (Gemini-Limit 24.10.)
+const FUN_TTS = /^(ph-gay(-friends)?|ph-low-[1-5]|ph-din|ph-bust)$/; // ph-bust: bis BUST-Clips generiert sind (Gemini-Limit 24.10.)
 
 function enqueueSequence(seq, { prio = 1, replace = false } = {}) {
   if (!settings.enabled) return;
