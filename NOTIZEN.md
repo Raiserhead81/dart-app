@@ -126,3 +126,10 @@
   Auto-Erkennung an echter Scheibe final verifizieren (Kay-Quote einholen)
 - Omni-Recherche: 4 Kameras = 99,7% - Single-Cam Grenze ~90-95%. 2. Handy als
   Zweitkamera = moeglicher Ausbau (gratis), Kay wollte erst keine Hardware kaufen
+
+## 2026-11-11 Kays erstes echtes Spiel — 5-Punkte-Feedback (Deploy 1.0.1794431805)
+- PUNKT 3 PAD: X01-Pad jetzt AUFSTEIGEND 1..20 (Telefon-Prinzip, 1 oben links). E2E-Beweis scripts/e2e-pad-avg.mjs: PAD ERSTE 4 [1,2,3,4].
+- PUNKT 4 AVERAGE: averages(state,i) in src/x01.js (Leg-O aus dartsInLeg + remaining, Match-O aus legEvents.remainingEnds + throws gesamt). Spielerkarte zeigt IMMER "Leg Ø x · Match Ø y" (play.js + onlinematch.js pcard). 4 neue Tests, Suite 201/201.
+- PUNKT 1+2 SPIELER LOKAL=NETZWERK: (a) Login verknüpft Profil mit accountId; (b) Freunde als Chips im Spiel-Setup (store.state.friends, Auto-Load 1x/Start), Tap fuellt Feld + data-aid; (c) Game-Records tragen accountIds; (d) Server syncPush stellt lokale Spiele ALLEN beteiligten FREUNDEN zu (synced_games id+':'+uid, nur befreundete, Muster wie Online-Match). LIVE bewiesen mit zztestkay11a/b: B pullt zzshare1. (e) Stats: neuer Block "Gegeneinander" (headToHead in src/stats.js) mit H2H-Score + 8 Kennzahlen-Vergleich, beide Selects auf rerender() (vorher Doppel-Append-Risiko).
+- PUNKT 5/6 CALLER-GEMURMEL: Wurzel BEWIESEN = 49 Gemini-Charon-Clips rest-453..501 im Default-Set elevenlabs-brian (mtimes 24.10. gegenueber 22.10.; 49/500 = Kays 10%-Quote bei 501-Start). Ersetzt durch echte ElevenLabs-Brian-Clips (stability 0.55, gen_brian_restaustausch.py, 49/49 ok), Charon-Originale in _charon-backup-20261111/. Live: rest-453/477/501 HTTP 200. Achtung: daniel+classic-en haben weiterhin Charon ab rest-171 — nur nachziehen wenn Kay diese Sets nutzt und meckert.
+- E2E: scripts/e2e-pad-avg.mjs, e2e-vergleich.mjs (Screenshot /tmp/dart-cmp.png; kein Vision-Modell in der Session, DOM-Text-Beweis gefuehrt). Testkonten zztestkay11a/b in Live-DB (Freundschafts-/Share-Beweis).

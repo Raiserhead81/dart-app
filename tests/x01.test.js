@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { newX01, applyDart, setupFromSettings } from '../src/x01.js';
+import { newX01, applyDart, averages, setupFromSettings } from '../src/x01.js';
 import { makeThrow, parseThrowInput } from '../src/segments.js';
 
 const T20 = () => makeThrow('triple', 20);
@@ -221,4 +221,55 @@ describe('Setup-Voreinstellung (setupFromSettings)', () => {
     s.leg.remaining[p] = 40;
     return applyDart(s, { k: 'double', n: 20, c: 'D20', v: 40 });
   }
+});
+
+// KAY 11.11.: 2 Averages immer sichtbar — Leg-O + Match-O (averages())
+describe('averages(): Leg-O und Match-O', () => {
+  const T20 = makeThrow('triple', 20);
+  const finishLeg = (s, p) => { s.current = p; s.leg.remaining[p] = 40; return applyDart(s, { k: 'double', n: 20, c: 'D20', v: 40 }); };
+
+  it('leeres Spiel: beide null', () => {
+    const s = newX01({ start: 501, players: ['A', 'B'] });
+    const a = averages(s, 0);
+    expect(a.leg).toBeNull();
+    expect(a.match).toBeNull();
+  });
+
+  it('im 1. Leg sind Leg- und Match-O identisch', () => {
+    const s = newX01({ start: 501, players: ['A', 'B'], firstTo: 3 });
+    applyDart(s, T20); applyDart(s, T20); applyDart(s, T20); // 180 Punkte, 3 Darts
+    const a = averages(s, 0);
+    expect(a.leg).toBe(180);   // 180 Punkte / 3 Darts * 3
+    expect(a.match).toBe(180);
+  });
+
+  it('nach Leg-Wechsel: Leg-O startet neu, Match-O akkumuliert korrekt', () => {
+    const s = newX01({ start: 501, players: ['A', 'B'], firstTo: 3 });
+    // Leg 1: A punktet 459 in 9 Darts, finish D20 => 10 Darts, B Rest 441 (60 Punkte in 9 Darts)
+    s.leg.remaining[0] = 459 + 40; s.leg.dartsInLeg[0] = 9; s.leg.remaining[1] = 441; s.leg.dartsInLeg[1] = 9;
+    s.throws[0].push(...Array.from({ length: 9 }, () => ({ ...T20, leg: 1 })));
+    s.throws[1].push(...Array.from({ length: 9 }, () => ({ ...T20, leg: 1, v: Math.round(441 / 9) })));
+    const ev = finishLeg(s, 0);
+    expect(ev.type).toBe('leg');
+    // Leg 2: A wirft 1 Dart T20
+    s.current = 0;
+    applyDart(s, T20);
+    const a = averages(s, 0);
+    expect(a.leg).toBe(180);                                     // Leg 2: 60 Punkte / 1 Dart * 3
+    expect(a.match).toBe(Math.round(561 / 11 * 3 * 10) / 10);   // (501+60) / 11 Darts * 3 = 153
+    const b = averages(s, 1);
+    expect(b.leg).toBeNull();                                    // B: 0 Darts im Leg 2
+    expect(b.match).toBe(Math.round(60 / 9 * 3 * 10) / 10);     // 60 Punkte / 9 Darts * 3 = 20
+  });
+
+  it('Bust-Visit zaehlt 0 Punkte, Darts zaehlen weiter', () => {
+    const s = newX01({ start: 501, players: ['A'] });
+    applyDart(s, T20); applyDart(s, T20); applyDart(s, T20); // Rest 321, 3 Darts
+    s.leg.remaining[0] = 5;                                // naechster Visit: T20 = Bust
+    applyDart(s, T20);
+    const a = averages(s, 0);
+    expect(s.leg.remaining[0]).toBe(321);                  // zurueck auf visitStart
+    expect(a.leg).toBe(Math.round(180 / 4 * 3 * 10) / 10); // 180 Punkte / 4 Darts * 3 = 135
+    expect(a.match).toBe(135);
+  });
 });

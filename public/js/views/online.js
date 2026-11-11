@@ -58,9 +58,13 @@ function renderAuth(view) {
         const res = await fn(name.value.trim(), pass.value);
         setToken(res.token);
         store.state.auth = { token: res.token, name: res.name, friendCode: res.friendCode, userId: res.userId };
-        // Profil anlegen/verknuepfen
+        // Profil anlegen/verknuepfen — KAY 11.11.: Profil bekommt die accountId,
+        // damit lokale Spiele dem Konto zugerechnet werden (Statistik lokal+online).
         const { addProfile } = await import('/js/core/storage.js');
         if (!store.state.profiles.some(p => p.name === res.name)) addProfile(store.state, res.name);
+        const prof = store.state.profiles.find(p => p.name === res.name);
+        if (prof) prof.accountId = res.userId;
+        store.state.friendsLoaded = false; // Freunde neu laden
         store.state.activeProfile = res.name;
         store.save();
         toast(mode.value === 'login' ? 'Willkommen zurück!' : `Konto erstellt · Freundescode ${res.friendCode}`);
@@ -110,6 +114,8 @@ async function renderFriends(view) {
   );
   try {
     const friends = await api.friends();
+    store.state.friends = friends.map(f => ({ userId: f.userId, name: f.name }));
+    store.save(); // KAY 11.11.: Freunde auch im Setup (lokal spielbar) anzeigen
     const rank = await api.ranking();
     const byId = new Map(rank.map(r => [r.userId, r]));
     if (!friends.length) {

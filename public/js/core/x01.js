@@ -197,6 +197,23 @@ export function currentCheckoutHint(state, dartsLeft) {
   return { rest, dartsLeft };
 }
 
+// KAY: Average IMMER sichtbar, 2 Zahlen — aktueller Leg + gesamtes Match (11.11.).
+// Leg-O: Punkte im laufenden Leg / Darts im Leg (dartsInLeg zaehlt laufenden Visit live).
+// Match-O: Punkte aller Legs (legEvents.remainingEnds + aktuelle Leg) / alle Darts (throws).
+export function averages(state, i) {
+  const leg = state.leg;
+  const legDarts = leg.dartsInLeg[i];
+  const legScored = Math.max(0, state.start - leg.remaining[i]);
+  let matchScored = legScored;
+  for (const le of state.legEvents || []) {
+    matchScored += le.winner === i ? state.start : Math.max(0, state.start - ((le.remainingEnds || [])[i] ?? state.start));
+  }
+  const matchDarts = state.throws[i].length;
+  const r1 = legDarts > 0 ? Math.round(legScored / legDarts * 3 * 10) / 10 : null;
+  const r2 = matchDarts > 0 ? Math.round(matchScored / matchDarts * 3 * 10) / 10 : null;
+  return { leg: r1, match: r2 };
+}
+
 export function cloneState(state) {
   return JSON.parse(JSON.stringify(state));
 }

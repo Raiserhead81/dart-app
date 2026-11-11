@@ -131,4 +131,26 @@ describe('Freunde + Rangliste', () => {
     const pullB = await call('/sync/games', { token: b.token });
     expect(pullB.data.games.some(g => g.id === 'g-local-1')).toBe(false);
   });
+  it('KAY 11.11.: lokales Spiel gegen FREUND wird dem Freund zugestellt (Statistik lokal+online)', async () => {
+    const push = await call('/sync/games', {
+      method: 'POST', token: a.token,
+      body: { games: [{ id: 'g-share-1', kind: 'x01', date: '2026-11-11T20:00:00Z', players: ['Anna', 'Ben'], results: [{ player: 'Anna', points: 501, darts: 20, won: true }, { player: 'Ben', points: 400, darts: 20 }] }] }
+    });
+    expect(push.data.saved).toBe(1);
+    const pullB = await call('/sync/games', { token: b.token });
+    const got = pullB.data.games.find(g => String(g.id).startsWith('g-share-1'));
+    expect(got?.players).toContain('Ben');            // Freund sieht das lokale Spiel
+    expect(got?.results.some(r => r.player === 'Ben' && r.points === 400)).toBe(true);
+    const pullC = await call('/sync/games', { token: c.token });
+    expect(pullC.data.games.some(g => String(g.id).startsWith('g-share-1'))).toBe(false); // Unbefreundete: nichts
+  });
+
+  it('KAY 11.11.: Zuordnung auch per accountIds (Name egal)', async () => {
+    await call('/sync/games', {
+      method: 'POST', token: a.token,
+      body: { games: [{ id: 'g-share-2', kind: 'x01', date: '2026-11-11T20:05:00Z', players: ['Anna', 'Spitzname'], accountIds: [a.userId, b.userId], results: [{ player: 'Anna', points: 301, darts: 15, won: true }, { player: 'Spitzname', points: 200, darts: 15 }] }] }
+    });
+    const pullB = await call('/sync/games', { token: b.token });
+    expect(pullB.data.games.some(g => String(g.id).startsWith('g-share-2'))).toBe(true);
+  });
 });

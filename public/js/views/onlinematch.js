@@ -5,6 +5,7 @@ import { api, getAuth } from '/js/api.js';
 import { buildBoard } from '/js/board.js';
 import { el, icon, toast } from '/js/util.js';
 import { parseThrowInput, makeThrow } from '/js/core/segments.js';
+import { averages } from '/js/core/x01.js';
 import { suggestCheckout } from '/js/core/checkout.js';
 import { callVisitEnd, callGameShot, callBust, clearQueue, preloadForRest } from '/js/caller-voice.js';
 import { store, rerender } from '/js/app.js';
@@ -88,10 +89,12 @@ export function renderOnlineMatch(view, matchId) {
 
     const cards = el('div', { class: 'scorehead' });
     (gameState.players || []).forEach((p, i) => {
+      const avgs = averages(gameState, i); // KAY: Leg-Ø + Match-Ø immer sichtbar (11.11.)
+      const fmtA = (v) => v != null ? String(v).replace('.', ',') : '–';
       cards.append(el('div', { class: 'pcard' + (gameState.current === i && m.status === 'active' ? ' turn' : '') },
         el('div', { class: 'name' }, p.name + ` · ${gameState.legsWon[i]}`),
         el('div', { class: 'rest num' }, String(gameState.leg.remaining[i])),
-        el('div', { class: 'meta' }, gameState.current === i ? 'am Zug' : '')
+        el('div', { class: 'meta' }, `Leg Ø ${fmtA(avgs.leg)} · Match Ø ${fmtA(avgs.match)}` + (gameState.current === i && m.status === 'active' ? ' · am Zug' : ''))
       ));
     });
     root.append(cards);

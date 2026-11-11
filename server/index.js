@@ -293,11 +293,41 @@ app.post('/api/sync/games', auth, apiLimit, (req, res) => {
   `);
   for (const g of games) {
     if (!g || !g.id || !g.kind) continue;
-    ins.run(String(g.id).slice(0, 64), req.user.id, JSON.stringify(g), g.date || now, now, now);
+    const gid = String(g.id).slice(0, 64);
+    const body = JSON.stringify(g);
+    ins.run(gid, req.user.id, body, g.date || now, now, now);
     saved++;
+    // KAY 11.11.: lokale Spiele auch den BETEILIGTEN Spielern zustellen,
+    // damit Statistik + Vergleich lokal UND im Netzwerk identisch sind.
+    for (const uid of participantIds(g, req.user.id)) {
+      ins.run(gid.slice(0, 48) + ':' + uid, uid, body, g.date || now, now, now);
+    }
   }
   res.json({ ok: true, saved });
 });
+
+// Beteiligte Accounts eines Games: accountIds (falls bekannt) + Namen, die zu
+// Accounts passen — aber NUR eigene oder befreundete (keine Fremd-Zuordnung).
+function participantIds(g, uploaderId) {
+  const ids = new Set();
+  const isFriend = db.prepare('SELECT 1 FROM friendships WHERE user_id=? AND friend_id=?');
+  const byName = db.prepare('SELECT id FROM users WHERE name=?');
+  for (const pid of g.accountIds || []) {
+    const n = Number(pid);
+    if (Number.isInteger(n) && n > 0) ids.add(n);
+  }
+  for (const p of g.players || []) {
+    const u = byName.get(String(p).slice(0, 24));
+    if (u) ids.add(u.id);
+  }
+  const out = [];
+  for (const id of ids) {
+    if (id === uploaderId) continue;
+    if (id === 0 || !isFriend.get(uploaderId, id)) continue; // nur echte Freunde
+    out.push(id);
+  }
+  return out;
+}
 
 app.get('/api/sync/games', auth, (req, res) => {
   const since = String(req.query.since || '');

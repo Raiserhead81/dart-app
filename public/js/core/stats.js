@@ -147,3 +147,19 @@ export function statDeltas(cur, prev) {
     games: cur.games - prev.games
   };
 }
+
+// KAY 11.11.: Direktvergleich zweier Spieler — gemeinsame Spiele (lokal + Netzwerk,
+// denn nach Sync liegen alle Spiele im selben store), Siege je Spieler.
+export function headToHead(games, a, b) {
+  let n = 0, winsA = 0, winsB = 0;
+  for (const g of games || []) {
+    const rs = g.results || [];
+    const ra = rs.find(r => r.player === a);
+    const rb = rs.find(r => r.player === b);
+    if (!ra || !rb) continue;
+    n++;
+    if (ra.won && !rb.won) winsA++;
+    else if (rb.won && !ra.won) winsB++;
+  }
+  return { games: n, winsA, winsB };
+}

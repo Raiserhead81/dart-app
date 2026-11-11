@@ -1,6 +1,6 @@
 // Statistik: KPIs, Wochen-Trend, Heatmap, Stärken/Schwächen, Tipps.
 
-import { computePlayerStats, knownPlayers } from '/js/core/stats.js';
+import { computePlayerStats, knownPlayers, headToHead } from '/js/core/stats.js';
 import { weeklyTrend, weekSummaryText, fmt } from '/js/core/weeks.js';
 import { analysePlayer, headlineFinding } from '/js/core/analysis.js';
 import { tipsFor } from '/js/core/tips.js';
@@ -9,7 +9,7 @@ import { lineChart } from '/js/charts.js';
 import { el, icon, pct } from '/js/util.js';
 import { bestRecords, } from '/js/core/records.js';
 import { countFormat, trendProjection } from '/js/core/statsfx.js';
-import { store, navigate } from '/js/app.js';
+import { store, navigate, rerender } from '/js/app.js';
 
 const SERIES = [
   { key: 'avg3', label: '3-Dart-Avg', color: '#46c47a', y: [0, 90] },
@@ -35,7 +35,7 @@ export function renderStats(view, arg) {
   const current = arg || store.state.statsPlayer || players[0].player;
   store.state.statsPlayer = current;
 
-  const sel = el('select', { onchange: (e) => { store.state.statsPlayer = e.target.value; store.save(); renderStats(view, e.target.value); } },
+  const sel = el('select', { onchange: (e) => { store.state.statsPlayer = e.target.value; store.save(); rerender(); } },
     ...players.map(p => el('option', { value: p.player, selected: p.player === current ? '' : null }, p.player)));
 
   const stats = computePlayerStats(games, current);
@@ -89,6 +89,44 @@ export function renderStats(view, arg) {
     )
   );
   view.append(hero);
+
+  // ===== KAY 11.11.: Gegeneinander-Vergleich (lokal + Netzwerk, alle Spiele) =====
+  const others = players.filter(p => p.player !== current);
+  if (others.length) {
+    const cmpState = { b: store.state.statsCompare || others[0].player };
+    if (!others.some(o => o.player === cmpState.b)) cmpState.b = others[0].player;
+    const cmpSel = el('select', { onchange: (e) => { store.state.statsCompare = e.target.value; store.save(); rerender(); } },
+      ...others.map(o => el('option', { value: o.player, selected: o.player === cmpState.b ? '' : null }, o.player)));
+    const drawCmp = () => {
+      const bName = cmpState.b;
+      const sb = computePlayerStats(games, bName);
+      const h2h = headToHead(games, current, bName);
+      const row = (label, va, vb) => el('div', { class: 'cmprow' },
+        el('div', { class: 'v' }, va ?? '–'),
+        el('div', { class: 'l' }, label),
+        el('div', { class: 'v' }, vb ?? '–'));
+      const box = el('div', { class: 'panel', id: 'compare' },
+        el('div', { class: 'row', style: 'justify-content:space-between' },
+          el('h2', { style: 'margin:0' }, 'Gegeneinander'), cmpSel),
+        el('div', { class: 'cmphead' },
+          el('div', { class: 'name' }, current),
+          el('div', { class: 'h2h num' }, h2h.games ? `${h2h.winsA} : ${h2h.winsB}` : '– : –'),
+          el('div', { class: 'name right' }, bName)),
+        h2h.games ? el('div', { class: 'small muted', style: 'margin:2px 0 8px' }, `${h2h.games} gemeinsame Spiele`) : '',
+        el('div', { class: 'cmplist' },
+          row('3-Dart-Avg', fmt(stats.avg3), fmt(sb.avg3)),
+          row('First 9', fmt(stats.first9), fmt(sb.first9)),
+          row('Doppel %', pct(stats.doubles.pct), pct(sb.doubles.pct)),
+          row('Checkout %', pct(stats.checkout.pct), pct(sb.checkout.pct)),
+          row('180er', String(stats.counts.c180), String(sb.counts.c180)),
+          row('100+', String(stats.counts.c100), String(sb.counts.c100)),
+          row('Legs', `${stats.legsWon}/${stats.legsPlayed}`, `${sb.legsWon}/${sb.legsPlayed}`),
+          row('Spiele', String(stats.games), String(sb.games))
+        ));
+      return box;
+    };
+    view.append(drawCmp());
+  }
 
   // ===== KAY-NEU: Letztes Match direkt unter dem Hero (nach Spielende nahtlos sichtbar) =====
   const lastGame = games.filter(g => g.kind === 'x01' && (g.results || []).some(r => r.player === current)).slice(-1)[0];

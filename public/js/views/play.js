@@ -2,7 +2,7 @@
 // riesige Scores). Zahlenpad ist die Haupteingabe — Tap zaehlt SOFORT, Auto-Weiter nach
 // 3 Darts. Board nur optional als Overlay ("Scheibe zeigen", Standard aus).
 
-import { newX01, applyDart, setupFromSettings } from '/js/core/x01.js';
+import { newX01, applyDart, averages, setupFromSettings } from '/js/core/x01.js';
 import { newCricket, applyCricketDart, cricketNextTurn } from '/js/core/cricket.js';
 import { buildX01GameRecord } from '/js/core/result.js';
 import { makeThrow } from '/js/core/segments.js';
@@ -10,6 +10,7 @@ import { suggestCheckout } from '/js/core/checkout.js';
 import { addGame } from '/js/core/storage.js';
 import { buildBoard } from '/js/board.js';
 import { el, icon, toast, uid } from '/js/util.js';
+import { getAuth } from '/js/api.js';
 import { callDart, callVisitEnd, callGameShot, callSetWon, callWhatPerformance, callDoubleRequired, callBigFish, clearQueue, flushPending, callerBusyMs, callerSettings, preloadForRest, unlockAudio, warmAudioPool, warmClipCache, warmClipProgress } from '/js/caller-voice.js';
 import { newRecordsBroken } from '/js/core/records.js';
 import { turnHoldMs } from '/js/core/turnhold.js';
@@ -43,10 +44,43 @@ function renderSetup(view) {
   // KAY-NEU: gemerkte Voreinstellung — zuletzt genutzte Kombi ist vorausgewaehlt
   const sel = { ...setupFromSettings(store.state.settings), doubleOut: true, doubleIn: false, count: 1, useBoard: false };
 
-  const nameInputs = names.map((n, i) => el('input', {
-    type: 'text', value: i === 0 ? n : n.startsWith('Spieler') ? '' : n,
-    'data-pi': i, placeholder: 'Spieler ' + (i + 1), maxlength: 24
-  }));
+  const nameInputs = names.map((n, i) => {
+    const inp = el('input', {
+      type: 'text', value: i === 0 ? n : n.startsWith('Spieler') ? '' : n,
+      'data-pi': i, placeholder: 'Spieler ' + (i + 1), maxlength: 24
+    });
+    inp.addEventListener('input', () => { delete inp.dataset.aid; }); // Hand-Edit loescht Konto-Verknuepfung
+    return inp;
+  });
+
+  // KAY 11.11.: GLEICHE Spieler lokal wie im Netzwerk — Freunde direkt antippbar,
+  // Statistik laeuft dann lokal + online zusammen (Sync stellt Spiele allen Beteiligten zu).
+  const friendRows = el('div', { class: 'row', style: 'flex-wrap:wrap;gap:6px;margin:2px 0 8px' });
+  const fillFriend = (name, userId) => {
+    const inp = nameInputs.find(i2 => !i2.value.trim() && i2.dataset.pi !== '0') || nameInputs.find(i2 => !i2.value.trim());
+    if (!inp) return toast('Alle Felder belegt');
+    inp.value = name;
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    inp.dataset.aid = String(userId); // NACH dispatch setzen (Listener loescht aid)
+    buzz(HAPTIC.tap);
+  };
+  const renderFriendChips = () => {
+    friendRows.innerHTML = '';
+    const friends = store.state.friends || [];
+    if (!friends.length) return;
+    friendRows.append(el('span', { class: 'small muted', style: 'align-self:center' }, 'Netzwerk:'));
+    for (const f of friends) {
+      friendRows.append(el('button', { class: 'chip', onclick: () => fillFriend(f.name, f.userId) }, icon('i-user') + ' ' + f.name));
+    }
+  };
+  renderFriendChips();
+  if (getAuth()?.token && !(store.state.friends || []).length && !store.state.friendsLoaded) {
+    store.state.friendsLoaded = true; // nur einmal pro App-Start automatisch
+    import('/js/api.js').then(({ api }) => api.friends().then(fs => {
+      store.state.friends = (fs || []).map(f => ({ userId: f.userId ?? f.id, name: f.name }));
+      store.save(); renderFriendChips();
+    })).catch(() => {});
+  }
 
   const startChips = STARTS.map(s => el('button', {
     class: 'chip num' + (s === sel.start ? ' on' : ''), onclick: (e) => {
@@ -106,11 +140,16 @@ function renderSetup(view) {
     class: 'btn primary wide mt', onclick: () => {
       const chosen = [...view.querySelectorAll('input[data-pi]')].map(inp => inp.value.trim()).filter(Boolean).slice(0, sel.count);
       if (!chosen.length) return toast('Mindestens ein Spielername');
+      // KAY 11.11.: Account-IDs je Spieler mitnehmen (Freunde + eigener Account) —
+      // damit lokale Spiele beim Sync allen Beteiligten zugestellt werden.
+      const aids = [...view.querySelectorAll('input[data-pi]')].map(inp => inp.dataset.aid || null).slice(0, sel.count);
       if (sel.mode === 'x01') {
         const st = newX01({ start: sel.start, players: chosen, doubleOut: sel.doubleOut, doubleIn: sel.doubleIn, firstTo: sel.firstTo, setsTo: sel.setsTo, id: uid() });
+        st.accountIds = chosen.map((nm, i) => aids[i] ? Number(aids[i]) : (getAuth() && getAuth().name === nm ? getAuth().userId : null));
         store.state.session = { type: 'x01', state: st, snapshots: [], useBoard: sel.useBoard, useCamera: !!sel.useCamera, date: new Date().toISOString() };
       } else {
         const st = newCricket({ players: chosen, cutThroat: sel.mode === 'cutthroat' });
+        st.accountIds = chosen.map((nm, i) => aids[i] ? Number(aids[i]) : (getAuth() && getAuth().name === nm ? getAuth().userId : null));
         store.state.session = { type: 'cricket', state: st, snapshots: [], useBoard: sel.useBoard, useCamera: !!sel.useCamera, date: new Date().toISOString() };
       }
       store.state.settings.lastMode = sel.mode;
@@ -160,8 +199,9 @@ function renderSetup(view) {
       el('div', { class: 'row' }, ...setChips)
     ),
     el('div', { class: 'panel' },
-      el('h2', {}, 'Spieler', el('span', { class: 'sub' }, '1 bis 4, lokal')),
+      el('h2', {}, 'Spieler', el('span', { class: 'sub' }, '1 bis 4, lokal & Freunde')),
       el('div', { class: 'row' }, ...countChips),
+      friendRows,
       el('div', { class: 'grid mt', style: 'grid-template-columns:repeat(auto-fill,minmax(200px,1fr))' }, ...nameInputs)
     ),
     startBtn
@@ -350,7 +390,8 @@ function buildPad(view, session) {
   modeRow.append(...modeBtns);
 
   const grid = el('div', { class: 'padgrid' });
-  for (let n = 20; n >= 1; n--) {
+  // KAY: aufsteigend wie Telefontastatur — 1 oben links, nicht 20 (11.11.)
+  for (let n = 1; n <= 20; n++) {
     grid.append(el('button', {
       class: 'padkey num',
       onclick: () => {
@@ -408,7 +449,8 @@ function paintGame(view, session) {
     const rest = st.leg.remaining[i];
     const turn = st.current === i && !st.finished;
     const darts = st.throws[i].length;
-    const avg = darts > 0 ? Math.round((st.start - st.leg.remaining[i]) / darts * 3 * 10) / 10 : null;
+    const avgs = averages(st, i); // KAY: 2 Averages — Leg + Match (11.11.)
+    const fmtA = (v) => v != null ? String(v).replace('.', ',') : '–';
     const color = PLAYER_COLORS[i % PLAYER_COLORS.length];
     const legBoxes = [];
     for (let l = 0; l < st.firstTo; l++) legBoxes.push(el('span', { class: 'legbox' + (l < st.legsWon[i] ? ' won' : '') }));
@@ -425,7 +467,7 @@ function paintGame(view, session) {
       el('div', { class: 'sc-meta' },
         el('span', { class: 'sc-turn' }, turn ? 'AM ZUG' : ''),
         st.setsTo ? el('span', { class: 'sets-score' }, `Sets ${st.setsWon[i]}`) : '',
-        el('span', {}, avg != null ? 'Ø ' + String(avg).replace('.', ',') : ''),
+        el('span', { class: 'sc-avg', title: 'Ø im aktuellen Leg / Ø im ganzen Spiel' }, `Leg Ø ${fmtA(avgs.leg)} · Match Ø ${fmtA(avgs.match)}`),
         el('span', {}, lv != null ? `Last ${lv.points}` : `${darts} Darts`)
       )
     ));
@@ -748,6 +790,7 @@ export function finishSession(session, aborted, ev = null) {
   } else {
     record = {
       id: uid(), kind: session.type === 'cricket' ? 'cricket' : 'cutthroat', mode: st.mode,
+      accountIds: st.accountIds || st.players.map(() => null),
       label: st.mode === 'cutthroat' ? 'Cut-Throat' : 'Cricket',
       date,
       players: st.players.map(p => p.name),

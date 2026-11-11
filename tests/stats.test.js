@@ -86,3 +86,18 @@ describe('buildX01GameRecord + stats', () => {
     expect(d.checkout).toBe(5);
   });
 });
+
+// KAY 11.11.: H2H-Direktvergleich
+describe('headToHead()', () => {
+  it('zaehlt gemeinsame Spiele und Siege', async () => {
+    const m = await import('../src/stats.js');
+    const games = [
+      { results: [{ player: 'Kay', won: true }, { player: 'Chris', won: false }] },
+      { results: [{ player: 'Kay', won: false }, { player: 'Chris', won: true }] },
+      { results: [{ player: 'Kay', won: false }, { player: 'Anna', won: true }] }
+    ];
+    expect(m.headToHead(games, 'Kay', 'Chris')).toEqual({ games: 2, winsA: 1, winsB: 1 });
+    expect(m.headToHead(games, 'Kay', 'Anna')).toEqual({ games: 1, winsA: 0, winsB: 1 });
+    expect(m.headToHead(games, 'Kay', 'Niemand')).toEqual({ games: 0, winsA: 0, winsB: 0 });
+  });
+});

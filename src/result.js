@@ -91,6 +91,9 @@ export function buildX01GameRecord(state, meta = {}) {
     date: meta.date || state.createdAt,
     online: !!meta.online,
     players: state.players.map(p => p.name),
+    // KAY 11.11.: Account-Zuordnung je Spieler (null = rein lokaler Spieler) —
+    // Server stellt das Spiel damit allen BETEILIGTEN Accounts bereit.
+    accountIds: state.accountIds || state.players.map(() => null),
     results,
     boardThrows
   };
