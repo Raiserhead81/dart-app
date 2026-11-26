@@ -6,12 +6,12 @@ import { newX01, applyDart, averages, setupFromSettings } from '/js/core/x01.js'
 import { newCricket, applyCricketDart, cricketNextTurn } from '/js/core/cricket.js';
 import { buildX01GameRecord } from '/js/core/result.js';
 import { makeThrow } from '/js/core/segments.js';
-import { suggestCheckout } from '/js/core/checkout.js';
+import { checkoutAlternatives, suggestCheckout } from '/js/core/checkout.js';
 import { addGame } from '/js/core/storage.js';
 import { buildBoard } from '/js/board.js';
 import { el, icon, toast, uid } from '/js/util.js';
 import { getAuth } from '/js/api.js';
-import { callDart, callVisitEnd, callGameShot, callSetWon, callWhatPerformance, callDoubleRequired, callBigFish, clearQueue, flushPending, callerBusyMs, callerSettings, preloadForRest, unlockAudio, warmAudioPool, warmClipCache, warmClipProgress } from '/js/caller-voice.js';
+import { callDart, callVisitEnd, callGameShot, callSetWon, callWhatPerformance, callBigFish, clearQueue, flushPending, callerBusyMs, callerSettings, preloadForRest, unlockAudio, warmAudioPool, warmClipCache, warmClipProgress } from '/js/caller-voice.js';
 import { newRecordsBroken } from '/js/core/records.js';
 import { turnHoldMs } from '/js/core/turnhold.js';
 import { padThrow, padSpecial, pushSnapshot, popSnapshot, checkoutLine, HAPTIC } from '/js/core/pad.js';
@@ -439,6 +439,24 @@ function showBoardOverlay(session) {
 }
 
 /* ---- Zeichnen ---- */
+// KAY 02.12.: Banner = noetige Kombinationen (Haupt-Route + Alternativen)
+function paintBanner(view, rest, dartsLeft, forMatch, who = '') {
+  const co = view.querySelector('#coline');
+  if (!co) return;
+  co.innerHTML = '';
+  const routes = checkoutAlternatives(rest, dartsLeft, 3);
+  if (routes.length) {
+    co.append(
+      el('span', { class: 'co-label' }, 'CHECKOUT ' + (who ? who.toUpperCase() + ' · ' : '') + rest),
+      el('div', { class: 'co-main' }, el('span', { class: 'co-route num' }, routes[0].join(' ') + (forMatch ? '  (for the match)' : '')))
+    );
+    if (routes.length > 1) {
+      co.append(el('div', { class: 'co-alt num' }, routes.slice(1).map(r => `ODER ${r.join(' ')}`).join('   ·   ')));
+    }
+    preloadForRest(rest);
+  }
+}
+
 function paintGame(view, session) {
   const st = session.state;
   const cards = view.querySelector('#scorecards');
@@ -460,6 +478,8 @@ function paintGame(view, session) {
     const lastVisits = st.visits.filter(v => v.p === i);
     const lv = lastVisits[lastVisits.length - 1];
     const scored = Math.max(0, st.start - rest);
+    // KAY 02.12.: Kombi-Zeile pro Karte, sobald Rest im Aus (immer sichtbar, auch bei 3-4 Spielern)
+    const coRoute = (!st.finished && st.doubleOut && rest >= 2 && rest <= 170) ? suggestCheckout(rest, 3) : null;
     cards.append(el('div', { class: 'scorecard' + (turn ? ' turn' : ' dim'), style: `--pc:${color}` },
       el('div', { class: 'sc-head' }, el('span', { class: 'sc-name' }, p.name), el('span', { class: 'legboxes' }, ...setChipsUi, ...legBoxes)),
       el('div', { class: 'sc-rest num' + (restTickMemo[i] !== rest ? ' tick' : '') }, String(rest)),
@@ -467,24 +487,21 @@ function paintGame(view, session) {
       el('div', { class: 'sc-meta' },
         el('span', { class: 'sc-turn' }, turn ? 'AM ZUG' : ''),
         st.setsTo ? el('span', { class: 'sets-score' }, `Sets ${st.setsWon[i]}`) : '',
-        el('span', { class: 'sc-avg', title: 'Ø im aktuellen Leg / Ø im ganzen Spiel' }, `Leg Ø ${fmtA(avgs.leg)} · Match Ø ${fmtA(avgs.match)}`),
+        el('span', { class: 'sc-avg', title: 'Ø im aktuellen Leg / Ø im ganzen Spiel' }, (st.players.length >= 3 ? 'L' : 'Leg ') + 'Ø ' + fmtA(avgs.leg) + ' · ' + (st.players.length >= 3 ? 'M' : 'Match ') + 'Ø ' + fmtA(avgs.match)),
         el('span', {}, lv != null ? `Last ${lv.points}` : `${darts} Darts`)
-      )
+      ),
+      ...(coRoute ? [el('div', { class: 'co-mini num' }, 'CO ' + coRoute.join(' '))] : [])
     ));
     restTickMemo[i] = rest;
   });
 
   // Checkout dauerhaft sichtbar
-  const co = view.querySelector('#coline');
-  co.innerHTML = '';
-  const rest = st.leg.remaining[st.current];
-  if (!st.finished && st.doubleOut && rest <= 170 && rest >= 2) {
-    const forMatch = matchPoint(st, st.current);
-    const line = checkoutLine(rest, 3 - st.leg.visit.length, forMatch, suggestCheckout);
-    if (line) {
-      co.append(el('span', { class: 'co-label' }, 'CHECKOUT'), el('span', { class: 'co-route num' }, line));
-      preloadForRest(rest);
-    }
+  // KAY 02.12.: Kombinationen IMMER zeigen, sobald jemand im Aus ist (aktueller Spieler + Banner)
+  if (!st.finished && st.doubleOut) {
+    paintBanner(view, st.leg.remaining[st.current], 3 - st.leg.visit.length, matchPoint(st, st.current));
+  } else {
+    const co = view.querySelector('#coline');
+    if (co) co.innerHTML = '';
   }
 
   // Last visit
@@ -520,7 +537,8 @@ function doThrow(session, t, { rerenderView } = {}) {
   const forMatch = matchPoint(st, p);
   const ev = applyDart(st, t);
   store.save();
-
+  // KAY 02.12.: NACH JEDEM WURF sofort die geworfene Zahl ansagen (nur die Zahl, kein Gebrabbel).
+  callDart(t);
 
   const restAfter = st.leg.remaining[p];
   const visitDartsNow = st.leg.visit.length;
@@ -541,6 +559,14 @@ function doThrow(session, t, { rerenderView } = {}) {
         for (let i = 0; i < 3; i++) vb.append(el('div', { class: 'dartpill' + (labels[i] ? '' : ' empty') }, labels[i] || '·'));
       }
     } catch (e) { /* egal */ }
+    // KAY 02.12.: Kombis SOFORT nach dem 3. Dart (vor dem Turn-Hold), nicht erst nach dem Wechsel.
+    const restEnd = (ev.type === 'bust') ? restBefore : restAfter;
+    if (restEnd >= 2 && restEnd <= 170 && st.doubleOut) {
+      paintBanner(view, restEnd, 3, forMatch, st.players[p] ? st.players[p].name : '');
+    } else {
+      const co = view.querySelector('#coline');
+      if (co) co.innerHTML = '';
+    }
   }
 
   if (ev.type === 'bust') {
@@ -552,23 +578,17 @@ function doThrow(session, t, { rerenderView } = {}) {
   } else if (visitPoints >= 100 && visitDartsNow === 3) {
     flashBig(String(visitPoints), 'hundreds');
   }
-  // KAY: KEINE Einzel-Dart-Ansage mehr — der Caller spricht erst nach dem 3. Dart
-  // die Summe (siehe callVisitEnd / visitSequence).
+  // KAY 02.12.: Einzel-Dart-Zahl siehe callDart oben — kein weiterer Kommentar noetig.
 
   if (ev.type === 'ok') {
-    const restNow = st.leg.remaining[st.current];
-    const isSimpleDouble = restNow === 50 || (restNow >= 2 && restNow <= 40 && restNow % 2 === 0);
-    if (isSimpleDouble && st.leg.visit.length < 3 && dartsInVisit >= 1) callDoubleRequired(restNow === 50 ? 50 : restNow / 2, forMatch);
+    // KAY 02.12.: callDoubleRequired ('You require double...') WEG. Nur Clip-Vorladen bleibt (harmlos).
     preloadForRest(st.leg.remaining[st.current]);
   }
   if (ev.type === 'turn' || ev.type === 'noin' || ev.type === 'bust' || ev.type === 'leg' || ev.type === 'match') {
     const visit180 = visitPoints === 180 && !ev.type.includes('bust');
-    const visitHigh = (visitPoints >= 100 && visitPoints < 180) ? visitPoints : null;
-    // KAY: volle Visit-Labels (Gay-Check 1+5+20) + Summe — Einzel-Segmente werden
-    // nicht mehr angesagt, nur die Summe nach dem 3. Dart.
-    // KAY: BUST-Ansage bei Double-In ohne Start-Doppel (statt lapidarem No score)
-    callVisitEnd(st.leg.remaining[p] === 0 && ev.type !== 'match' ? 0 : st.leg.remaining[st.current] ?? restAfter, {
-      forMatch, bust: ev.type === 'bust', visit180, visitHigh, labels: session.visitLabels, points: visitPoints, noin: !st.leg.started[p]
+    // KAY 02.12.: Momente am Visit-Ende (gay/Beleidigung/180/Bust/Din) — Rest/Checkout-Ansage ist weg.
+    callVisitEnd({
+      bust: ev.type === 'bust', visit180, labels: session.visitLabels, points: visitPoints, noin: !st.leg.started[p]
     });
     session.visitLabels = [];
   }

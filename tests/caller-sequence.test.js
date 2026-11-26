@@ -1,102 +1,98 @@
 import { describe, it, expect } from 'vitest';
 import { visitSequence, endSequence, GAP_DART, GAP_AFTER_DARTS, GAP_CHECKOUT, GAP_APPLAUSE } from '../src/caller-sequence.js';
 
-describe('Caller-Sequenz (Kays Timing)', () => {
-  it('KAY: NUR Summe nach dem 3. Dart — keine Einzel-Segmente mehr', () => {
-    const seq = visitSequence({ labels: ['t20', 't20', 's20'], rest: 361, points: 100 });
-    expect(seq.map(s => s.clipId)).toEqual(['visit-100', 'rest-361']);
-    expect(seq[1].gapBeforeMs).toBe(GAP_AFTER_DARTS);
+const ids = seq => seq.map(s => s.clipId);
+
+describe('Caller-Sequenz (KAY 02.12.: nur Momente)', () => {
+
+  it('GAP-Konstanten (KAY 02.12.)', () => {
+    expect(GAP_DART).toBe(220);
+    expect(GAP_AFTER_DARTS).toBe(400);
+    expect(GAP_CHECKOUT).toBe(350);
+    expect(GAP_APPLAUSE).toBe(200);
   });
 
-  it('Summe unter 100: sc-<points>-Clip', () => {
-    const seq = visitSequence({ labels: ['s20', 's19', 's18'], rest: 444, points: 57 });
-    expect(seq.map(s => s.clipId)).toEqual(['sc-57', 'rest-444']);
-  });
-
-  it('KAY 11.11.: T20+5+1 in beliebiger Reihenfolge = GAAAY WITH FRIENDS statt Summe', () => {
-    for (const labels of [['t20', 's1', 's5'], ['s5', 't20', 's1'], ['s1', 's5', 't20']]) {
-      const seq = visitSequence({ labels, rest: 435, points: 66 });
-      expect(seq.map(s => s.clipId)).toEqual(['ph-gay-friends', 'rest-435']);
-    }
-  });
-
-  it('KAY 11.11.: T20+5+1 = GAAAY WITH FRIENDS AUCH beim Bust', () => {
-    const seq = visitSequence({ labels: ['t20', 's1', 's5'], rest: 5, bust: true, points: 0 });
-    expect(seq.map(s => s.clipId)).toEqual(['ph-gay-friends', 'rest-5']);
-  });
-
-  it('KAY: 1+5+20 in beliebiger Reihenfolge = GAAAY statt Summe', () => {
+  it('Gay: 1+5+20 in beliebiger Reihenfolge => exakt ph-gay', () => {
     for (const labels of [['s1', 's5', 's20'], ['s20', 's1', 's5'], ['s5', 's20', 's1']]) {
       const seq = visitSequence({ labels, rest: 475, points: 26 });
-      expect(seq.map(s => s.clipId)).toEqual(['ph-gay', 'rest-475']);
+      expect(ids(seq)).toEqual(['ph-gay']);
+      expect(seq[0].gapBeforeMs).toBe(0);
     }
   });
 
-  it('KAY: 1+5+20 = GAAAY AUCH beim Bust (Rest 26, kein Doppel)', () => {
+  it('Gay AUCH beim Bust', () => {
     const seq = visitSequence({ labels: ['s1', 's5', 's20'], rest: 26, bust: true, points: 0 });
-    expect(seq.map(s => s.clipId)).toEqual(['ph-gay', 'rest-26']);
+    expect(ids(seq)).toEqual(['ph-gay']);
   });
 
-  it('KAY: 3xT20 = 180-AUSRUF AUCH beim Bust (Rest 180, kein Doppel-Ende)', () => {
-    const seq = visitSequence({ labels: ['t20', 't20', 't20'], rest: 180, bust: true, points: 0, visit180: true });
-    expect(seq.map(s => s.clipId)).toEqual(['ph-180', 'rest-180']);
+  it('GayFriends: s1,s5,t20 in beliebiger Reihenfolge => ph-gay-friends', () => {
+    for (const labels of [['s1', 's5', 't20'], ['t20', 's1', 's5'], ['s5', 't20', 's1']]) {
+      expect(ids(visitSequence({ labels, rest: 435, points: 66 }))).toEqual(['ph-gay-friends']);
+    }
   });
 
-  it('KAY: Visit unter 10 => Summe + Beleidigung (5 Varianten rotierend)', () => {
-    const seq = visitSequence({ labels: ['s3', 's2', 's1'], rest: 444, points: 6 });
-    expect(seq.map(s => s.clipId)).toEqual(['sc-6', 'ph-low-1', 'rest-444']);
-    expect(seq[1].gapBeforeMs).toBe(GAP_DART);
-    expect(visitSequence({ labels: ['s3', 's3', 's3'], rest: 442, points: 9 })[1].clipId).toBe('ph-low-4');
-    expect(visitSequence({ labels: ['s1', 'miss', 'miss'], rest: 499, points: 1 })[1].clipId).toBe('ph-low-1');
+  it('GayFriends AUCH beim Bust', () => {
+    expect(ids(visitSequence({ labels: ['t20', 's1', 's5'], rest: 5, bust: true, points: 0 })))
+      .toEqual(['ph-gay-friends']);
   });
 
-  it('Rest <= 40: voller require-Satz + Doppel-Weg mit 350ms', () => {
-    const seq = visitSequence({ labels: ['s20', 's20'], rest: 40, points: 40, checkoutRoute: true }, 'dx-D20-match');
-    expect(seq.map(s => s.clipId)).toEqual(['sc-40', 'rest-40', 'dx-D20-match']);
-    expect(seq[1].gapBeforeMs).toBe(GAP_AFTER_DARTS);
-    expect(seq[2].gapBeforeMs).toBe(GAP_CHECKOUT);
+  it('noin => ph-din', () => {
+    expect(ids(visitSequence({ labels: ['noin', 'noin', 'noin'], rest: 501, points: 0, noin: true })))
+      .toEqual(['ph-din']);
   });
 
-  it('grössere Rests: Checkout-Pfad-Ansage co-<n>', () => {
-    const seq = visitSequence({ labels: ['t20', 't15'], rest: 96, points: 45 }, 'co-96');
-    expect(seq.map(s => s.clipId)).toEqual(['sc-45', 'rest-96', 'co-96']);
-  });
-
-  it('180: grosser Call statt drei Segment-Calls', () => {
+  it('visit180 (3xT20) => ph-180, auch beim Bust', () => {
     const seq = visitSequence({ labels: ['t20', 't20', 't20'], rest: 321, visit180: true });
-    expect(seq[0].clipId).toBe('ph-180');
-    expect(seq[1].clipId).toBe('rest-321');
-    expect(seq[1].gapBeforeMs).toBe(GAP_AFTER_DARTS);
+    expect(ids(seq)).toEqual(['ph-180']);
+    const bust = visitSequence({ labels: ['t20', 't20', 't20'], rest: 180, bust: true, visit180: true, points: 0 });
+    expect(ids(bust)).toEqual(['ph-180']);
   });
 
-  it('Bust: No score + Rest', () => {
-    const seq = visitSequence({ labels: ['t20'], rest: 501, bust: true });
-    expect(seq[0].clipId).toBe('ph-bust');
-    expect(seq[1].clipId).toBe('rest-501');
+  it('Bust ohne Spezialmoment => ph-bust', () => {
+    expect(ids(visitSequence({ labels: ['t20'], rest: 501, bust: true, points: 0 })))
+      .toEqual(['ph-bust']);
   });
 
-  it('Rest > 170: require-Satz ja (TTS-Fallback), kein Checkout-Clip; rest < 2: kein rest-Item', () => {
-    const over = visitSequence({ labels: ['t20'], rest: 501, points: 20 });
-    expect(over.map(s => s.clipId)).toEqual(['sc-20', 'rest-501']);
-    expect(visitSequence({ labels: ['t20'], rest: 1, points: 20 }).length).toBe(1);
+  it('Low Score: points 1..9 => ph-low-1..5 rotierend (points-1)%5+1', () => {
+    expect(visitSequence({ labels: ['s3', 's2', 's1'], rest: 444, points: 6 })[0].clipId).toBe('ph-low-1');
+    expect(visitSequence({ labels: ['s1', 'miss', 'miss'], rest: 499, points: 1 })[0].clipId).toBe('ph-low-1');
+    expect(visitSequence({ labels: ['s5', 's4', 'miss'], rest: 491, points: 9 })[0].clipId).toBe('ph-low-4');
+    expect(visitSequence({ labels: ['s2', 's2', 's1'], rest: 495, points: 5 })[0].clipId).toBe('ph-low-5');
+    expect(visitSequence({ labels: ['s3', 's3', 's3'], rest: 442, points: 9 })[0].clipId).toBe('ph-low-4');
+    expect(visitSequence({ labels: ['s3', 's3', 'miss'], rest: 495, points: 6 })[0].clipId).toBe('ph-low-1');
   });
 
-  it('Game-Shot-Sequenz mit Applaus', () => {
+  it('Normaler Visit (points 10..180, kein Moment) => LEERES Array', () => {
+    expect(visitSequence({ labels: ['s20', 's19', 's18'], rest: 444, points: 57 })).toEqual([]);
+    expect(visitSequence({ labels: ['s20', 's20', 's20'], rest: 441, points: 60 })).toEqual([]);
+    expect(visitSequence({ labels: ['t19', 's20', 's5'], rest: 417, points: 82 })).toEqual([]);
+    expect(visitSequence({ labels: ['s10', 'miss', 'miss'], rest: 491, points: 10 })).toEqual([]);
+  });
+
+  it('KEIN rest-, sc-, visit-, co-Clip; 2. Funktionsargument wird ignoriert', () => {
+    const seq = visitSequence({ labels: ['s20', 's20'], rest: 40, points: 40 }, 'dx-D20-match');
+    expect(seq).toEqual([]);
+    expect(visitSequence({ labels: ['t20', 't15'], rest: 96, points: 45 }, 'co-96')).toEqual([]);
+    for (const s of [
+      ...visitSequence({ labels: ['s1', 's5', 's20'], rest: 475, points: 26 }),
+      ...visitSequence({ labels: ['t20'], rest: 501, bust: true, points: 0 })
+    ]) {
+      expect(s.clipId).not.toMatch(/^(rest-|sc-|visit-|co-)/);
+    }
+  });
+
+  it('Game-Shot-Sequenz: gameshot-high, ph-leg-a-b, applause (ohne matchOver)', () => {
     const seq = endSequence({ matchOver: false, legsWonMe: 1, legsWonOpp: 0, applause: true });
-    expect(seq.map(s => s.clipId)).toEqual(['ph-gameshot-high', 'ph-leg-1-0', 'applause']);
+    expect(ids(seq)).toEqual(['ph-gameshot-high', 'ph-leg-1-0', 'applause']);
     expect(seq[2].gapBeforeMs).toBe(GAP_APPLAUSE);
     expect(seq[2].volume).toBeCloseTo(0.4);
     expect(seq[2].playMs).toBe(4000);
   });
 
-  it('Match-Ende: Game, set and match + laengerer Applaus', () => {
+  it('Match-Ende: gameshot-high, ph-match, laengerer Applaus; Applaus aus => kein applause', () => {
     const seq = endSequence({ matchOver: true, applause: true });
-    expect(seq.map(s => s.clipId)).toEqual(['ph-gameshot-high', 'ph-match', 'applause']);
+    expect(ids(seq)).toEqual(['ph-gameshot-high', 'ph-match', 'applause']);
     expect(seq[2].playMs).toBe(5000);
-  });
-
-  it('Applaus aus: keine applause-Clips', () => {
-    const seq = endSequence({ matchOver: false, applause: false });
-    expect(seq.some(s => s.clipId === 'applause')).toBe(false);
+    expect(endSequence({ matchOver: false, applause: false }).some(s => s.clipId === 'applause')).toBe(false);
   });
 });

@@ -58,17 +58,62 @@ function parseRoute(str) {
   return str.split(' ');
 }
 
-// Haupt-API: Route fuer Rest bei Double-Out. dartsLeft begrenzt die Laenge (1-3).
+// KAY 02.12.: NUR echte Finishes. Teilrouten (slice) sind RAUS — wenn der Rest mit
+// den verbleibenden Darts nicht gefinisht werden kann, ist man NICHT im Aus -> null.
 export function suggestCheckout(rest, dartsLeft = 3) {
   rest = Math.floor(rest);
   if (rest < 2 || rest > 170) return null;
-  const all = routeFor(rest);
-  if (!all) return null;
-  if (all.length > dartsLeft) {
-    // Teilroute: so viele Darts wie uebrig, letzter muss kein Finish sein -> trotzdem zeigen
-    return all.slice(0, dartsLeft);
+  const route = routeFor(rest);
+  if (!route || route.length > dartsLeft) return null;
+  return route;
+}
+
+// KAY 02.12.: Alternativen-Routen — ERSTE Route = suggestCheckout (klassischer Weg),
+// danach bis max-1 Alternativen (weniger Darts zuerst, T20/hohes Triple zuerst,
+// Bull vor Single, keine Duplikate, jede Route validateRoute-geprueft).
+export function checkoutAlternatives(rest, dartsLeft = 3, max = 3) {
+  rest = Math.floor(rest);
+  const main = suggestCheckout(rest, dartsLeft);
+  if (!main) return [];
+
+  const results = [main];
+  const seen = new Set([main.join(' ')]);
+  const candidates = [];
+
+  if (dartsLeft >= 2) {
+    const setups = [...TRIPLES, '25', 'Bull', ...SINGLES];
+    for (const a of setups) {
+      const c = doubleFor(rest - routeValue(a));
+      if (c) candidates.push([a, c]);
+    }
   }
-  return all;
+  if (dartsLeft >= 3) {
+    const bOrder = [...TRIPLES, '25', 'Bull', ...SINGLES];
+    outer:
+    for (const a of TRIPLES) {
+      const r1 = rest - routeValue(a);
+      if (r1 < 4) continue;
+      for (const b of bOrder) {
+        const r2 = r1 - routeValue(b);
+        if (r2 < 2) continue;
+        const c = doubleFor(r2);
+        if (c) {
+          candidates.push([a, b, c]);
+          if (candidates.length >= 200) break outer;
+        }
+      }
+    }
+  }
+
+  for (const cand of candidates) {
+    if (results.length >= max) break;
+    const key = cand.join(' ');
+    if (seen.has(key)) continue;
+    if (!validateRoute(cand, rest)) continue;
+    seen.add(key);
+    results.push(cand);
+  }
+  return results;
 }
 
 export function checkoutTableFull(rest) {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { suggestCheckout, checkoutTableFull, validateRoute, routeValue } from '../src/checkout.js';
+import { suggestCheckout, checkoutTableFull, checkoutAlternatives, validateRoute, routeValue } from '../src/checkout.js';
 
 const IMPOSSIBLE = [159, 162, 163, 165, 166, 168, 169];
 
@@ -41,10 +41,26 @@ describe('checkout table', () => {
     expect(suggestCheckout(171)).toBeNull();
   });
 
-  it('dartsLeft kuerzt die Route', () => {
-    expect(suggestCheckout(170, 1)).toEqual(['T20']);
-    expect(suggestCheckout(170, 2)).toEqual(['T20', 'T20']);
+  it('dartsLeft: nur ECHTE Finishes (KAY 02.12.)', () => {
+    expect(suggestCheckout(170, 1)).toBeNull();
+    expect(suggestCheckout(170, 2)).toBeNull();
     expect(suggestCheckout(40, 1)).toEqual(['D20']);
+    expect(suggestCheckout(100, 2)).toEqual(['T20', 'D20']);
+    expect(suggestCheckout(170, 3)).toEqual(['T20', 'T20', 'Bull']);
+  });
+
+  it('checkoutAlternatives (KAY 02.12.): Haupt-Route zuerst, Alternativen valide', () => {
+    const a = checkoutAlternatives(96, 3, 3);
+    expect(a[0]).toEqual(['T20', 'D18']);
+    expect(a.length).toBeGreaterThanOrEqual(2);
+    for (const r of a) expect(validateRoute(r, 96)).toBe(true);
+    const b = checkoutAlternatives(40, 1, 3);
+    expect(b).toEqual([['D20']]);
+    expect(checkoutAlternatives(170, 2, 3)).toEqual([]);
+    expect(checkoutAlternatives(159, 3, 3)).toEqual([]);
+    const c = checkoutAlternatives(32, 3, 3);
+    expect(c[0]).toEqual(['D16']);
+    expect(c.length).toBeGreaterThanOrEqual(2);
   });
 
   it('routeValue rechnet richtig', () => {

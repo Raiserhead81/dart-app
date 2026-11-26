@@ -198,7 +198,7 @@ label.field span { display: block; font-size: 11px; font-weight: 900; color: var
   box-shadow: 0 14px 34px rgba(0, 0, 0, .5), 0 0 0 1px color-mix(in srgb, var(--pc) 45%, transparent), 0 0 34px color-mix(in srgb, var(--pc) 30%, transparent);
   transform: translateY(-2px);
 }
-.scorecard.dim { opacity: .42; filter: saturate(.6); }
+.scorecard.dim { opacity: .55; filter: saturate(.75); } /* KAY 02.12.: passive Karten lesbarer */
 .sc-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
 .sc-name { font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: .14em; color: var(--pc); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sc-name::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: currentColor; margin-right: 7px; transform: translateY(-1px); }
@@ -218,18 +218,55 @@ label.field span { display: block; font-size: 11px; font-weight: 900; color: var
 .sc-progress { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .08); margin: 8px 0 6px; overflow: hidden; }
 .sc-progress-fill { height: 100%; background: linear-gradient(90deg, var(--pc), color-mix(in srgb, var(--pc) 70%, #fff)); border-radius: 2px; transition: width .3s ease-out; }
 .sc-meta { display: flex; gap: 12px; font-size: 11.5px; font-weight: 800; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
-.sc-turn { color: var(--gold); }
+.sc-turn { color: var(--gold); white-space: nowrap; }
+
+/* --- KAY 02.12.: Scorecards 3/4 Spieler kompakt (10/10 auch bei mehreren Spielern) --- */
+.scorecards:has(.scorecard:nth-child(3)) { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.scorecards:has(.scorecard:nth-child(3)) .scorecard { padding: 5px 8px 6px; min-height: 84px; border-radius: 10px; border-left-width: 4px; }
+.scorecards:has(.scorecard:nth-child(3)) .sc-rest { font-size: clamp(30px, 9.5vw, 64px); }
+.scorecards:has(.scorecard:nth-child(3)) .sc-meta { font-size: 8.5px; gap: 6px; flex-wrap: wrap; }
+.scorecards:has(.scorecard:nth-child(3)) .sc-name { font-size: 10px; }
+.scorecards:has(.scorecard:nth-child(3)) .legbox { width: 10px; height: 10px; border-width: 1.5px; }
+.scorecards:has(.scorecard:nth-child(3)) .sc-progress { margin: 3px 0 2px; height: 3px; }
+
+.scorecards:has(.scorecard:nth-child(4)) { grid-template-columns: repeat(2, 1fr); gap: 6px; }
+.scorecards:has(.scorecard:nth-child(4)) .scorecard { padding: 5px 10px 6px; min-height: 92px; border-radius: 11px; border-left-width: 4px; }
+.scorecards:has(.scorecard:nth-child(4)) .sc-rest { font-size: clamp(34px, 12vw, 72px); }
+.scorecards:has(.scorecard:nth-child(4)) .sc-meta { font-size: 9px; gap: 8px; }
+.scorecards:has(.scorecard:nth-child(4)) .sc-name { font-size: 11px; }
+.scorecards:has(.scorecard:nth-child(4)) .legbox { width: 10px; height: 10px; border-width: 1.5px; }
+.scorecards:has(.scorecard:nth-child(4)) .sc-progress { margin: 4px 0 3px; height: 3px; }
+
+/* --- GLM-Sicht-Fix 02.12. (7/10 -> 10/10): Dim lesbarer, Meta staerker, Banner luftiger --- */
+.scorecards:has(.scorecard:nth-child(3)) .scorecard.dim,
+.scorecards:has(.scorecard:nth-child(4)) .scorecard.dim { opacity: .82; filter: saturate(.92); }
+.scorecards:has(.scorecard:nth-child(3)) .scorecard.dim .sc-rest,
+.scorecards:has(.scorecard:nth-child(4)) .scorecard.dim .sc-rest { color: #f4f2ec; }
+.scorecards:has(.scorecard:nth-child(3)) .sc-meta { font-size: 10px; gap: 5px; flex-wrap: wrap; line-height: 1.5; }
+.scorecards:has(.scorecard:nth-child(4)) .sc-meta { font-size: 10px; gap: 6px; flex-wrap: wrap; line-height: 1.5; }
+.scorecards:has(.scorecard:nth-child(3)) .scorecard { min-height: 92px; }
+.scorecards:has(.scorecard:nth-child(4)) .scorecard { min-height: 98px; }
+.dartpill { text-transform: uppercase; }
+.checkout-banner { gap: 5px; }
+.co-alt { margin-top: 1px; }
+.co-label { font-size: 11px; color: #f5c95c; }
+.co-alt { letter-spacing: .08em; line-height: 1.4; }
+
 
 @keyframes coPulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(232, 182, 76, 0); } 50% { box-shadow: 0 0 22px 0 rgba(232, 182, 76, .35); } }
 .checkout-banner {
-  min-height: 42px; display: flex; align-items: center; justify-content: center; gap: 12px;
+  min-height: 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   background: linear-gradient(90deg, rgba(232, 182, 76, .16), rgba(232, 182, 76, .04));
-  border: 1px solid rgba(232, 182, 76, .55); border-radius: 12px; padding: 8px 14px;
+  border: 1px solid rgba(232, 182, 76, .55); border-radius: 12px; padding: 6px 14px;
   animation: coPulse 1.6s ease-in-out infinite;
 }
 .checkout-banner:empty { visibility: hidden; animation: none; }
+.co-main { display: flex; align-items: baseline; justify-content: center; gap: 10px; }
+.co-alt { font-size: 12.5px; font-weight: 700; color: color-mix(in srgb, var(--gold) 75%, var(--muted)); letter-spacing: .04em; }
+.co-mini { font-size: 10px; font-weight: 800; color: color-mix(in srgb, var(--gold) 85%, var(--muted)); letter-spacing: .06em; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scorecards:has(.scorecard:nth-child(3)) .co-mini, .scorecards:has(.scorecard:nth-child(4)) .co-mini { font-size: 9px; margin-top: 1px; }
 .co-label { font-size: 10px; font-weight: 900; letter-spacing: .16em; color: var(--gold); }
-.co-route { font-size: 22px; font-weight: 900; color: #ffe1a1; letter-spacing: .06em; }
+.co-route { font-size: 20px; font-weight: 900; color: #fff3d6; letter-spacing: .06em; }
 
 .visitbar { display: flex; gap: 8px; justify-content: center; min-height: 38px; }
 @keyframes dartIn { 0% { transform: scale(.55); opacity: 0; } 70% { transform: scale(1.06); } 100% { transform: scale(1); opacity: 1; } }
@@ -430,12 +467,14 @@ button.listitem strong { color: var(--cream); }
   .gbtn.undo { min-height: 30px; }
   .scorecards, .checkout-banner, .visitbar { grid-column: 1; }
   .pad { grid-column: 2; margin-top: 0; }
-  .scorecard { min-height: 0; padding: 4px 12px 6px; }
-  .sc-rest { font-size: clamp(30px, 15vh, 80px); }
+  .scorecard { min-height: 0; padding: 6px 12px 8px; }
+  .sc-rest { font-size: clamp(34px, 15.5vh, 104px); }
   .sc-progress { margin: 3px 0 2px; }
-  .sc-meta { font-size: 9.5px; }
-  .checkout-banner { min-height: 24px; padding: 3px 8px; }
-  .co-route { font-size: 14px; }
+  .sc-meta { font-size: 10px; }
+  .checkout-banner { min-height: 34px; padding: 2px 8px; margin-top: 2px; }
+  .co-route { font-size: 13px; }
+  .co-alt { font-size: 10px; }
+  .co-mini { font-size: 10px; }
   .visitbar { min-height: 24px; gap: 5px; }
   .dartpill { min-width: 40px; padding: 2px 7px; font-size: 12.5px; }
   .padmode { min-height: 24px; padding: 3px; font-size: 10px; }

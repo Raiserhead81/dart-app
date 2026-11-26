@@ -435,7 +435,7 @@ const FUN_TTS = /^(ph-gay(-friends)?|ph-low-[1-5]|ph-din|ph-bust)$/; // ph-bust:
 
 function enqueueSequence(seq, { prio = 1, replace = false } = {}) {
   if (!settings.enabled) return;
-  enqueue(seq.map(s => ({ clipId: s.clipId, urls: clipCandidatesForId(s.clipId), gapBeforeMs: s.gapBeforeMs || 0, volume: s.volume, playMs: s.playMs, text: textForClipId(s.clipId), prio, tts: FUN_TTS.test(s.clipId) })), { replace });
+  enqueue(seq.map(s => ({ clipId: s.clipId, urls: clipCandidatesForId(s.clipId), gapBeforeMs: s.gapBeforeMs || 0, volume: s.volume, playMs: s.playMs, text: textForClipId(s.clipId), prio, tts: FUN_TTS.test(s.clipId) })), { prio, replace }); // KAY 02.12.: prio durchreichen (Dart-Zahlen 0 = fluechtig)
 }
 
 // ---------- High-Level ----------
@@ -453,36 +453,25 @@ function enqueue(items, { replace = false } = {}) {
 }
 // Wartende FLÜCHTIGE verwerfen; laufender Clip + prio-1 (You require!) bleiben.
 export function flushPending() {
-  queue = queue.filter(i => (i.prio || 1) >= 1);
+  queue = queue.filter(i => (i.prio ?? 1) >= 1); // KAY 02.12. FIX: prio 0 ist fluechtig (0||1 waere 1 — falsch)
   resolveIdle();
 }
-// Dart-Call (je Wurf, einzeln mit 220ms Luft via Gap) — flüchtig
+// KAY 02.12.: pro Dart NUR die geworfene Zahl (sc-Clip, Zahlwort), kein Gebrabbel.
+// thr.v ist der fertige Wurfwert (makeThrow): T20=60, bull=50, outer=25, miss=0 ("no score").
 export function callDart(thr) {
   if (!settings.enabled || !settings.dartCalls) return;
-  if (thr.k === 'sum') {
-    enqueueSequence([{ clipId: 'sc-' + thr.v, gapBeforeMs: 220 }], { prio: 0 });
-    return;
-  }
-  if (thr.v === 180) { call180(); return; }
-  const segCode = thr.k === 'miss' ? 'miss' : thr.k === 'bull' ? 'bull' : thr.k === 'outer' ? '25' : (thr.k[0] + thr.n);
-  enqueueSequence([{ clipId: 'seg-' + segCode, gapBeforeMs: 220 }], { prio: 0 });
+  const v = Math.max(0, Math.min(180, Math.floor(Number(thr && thr.v) || 0)));
+  enqueueSequence([{ clipId: 'sc-' + v, gapBeforeMs: 220 }], { prio: 0 });
 }
 
-// Visit-Ende: Summen-Ansage (KAY: NUR nach dem 3. Dart, nie einzeln) + voller
-// require-Satz + Checkout-Weg — ersetzt Wartendes
-export function callVisitEnd(rest, { forMatch = false, bust = false, visit180 = false, visitHigh = null, labels = [], points = null, noin = false } = {}) {
+// KAY 02.12.: Visit-Ende = NUR Moment-Clips (gay/Beleidigung/180/Bust/Din).
+// Kein Rest-Satz, kein Checkout-Call, kein Summen-Jubel ("You require" ist raus).
+// Leere Sequenz (normaler Visit) enqueued NICHTs — laufende Dart-Zahlen bleiben.
+export function callVisitEnd({ bust = false, visit180 = false, labels = [], points = null, noin = false } = {}) {
   if (!settings.enabled) return;
-  let coId = null;
-  if (settings.checkout && rest >= 2 && rest <= 170) {
-    const route = suggestCheckout(rest, 3);
-    if (route) {
-      coId = (rest === 50 || (rest >= 2 && rest <= 40 && rest % 2 === 0))
-        ? ('dx-' + (rest === 50 ? 'Bull' : 'D' + (rest / 2)) + (forMatch ? '-match' : ''))
-        : ('co-' + rest);
-    }
-  }
-  const seq = visitSequence({ labels, rest, bust, visit180, visitHigh, points, noin }, coId);
-  trace('visitend', { rest, ids: seq.map(s => s.clipId).join(',') });
+  const seq = visitSequence({ labels, bust, visit180, points, noin });
+  if (!seq.length) return;
+  trace('visitend', { ids: seq.map(s => s.clipId).join(',') });
   enqueueSequence(seq, { replace: true });
 }
 
@@ -519,12 +508,7 @@ export function callSetWon(setsMe, setsOpp) {
   ], { replace: true });
 }
 
-export function callDoubleRequired(dNumber, forMatch = false) {
-  if (!settings.enabled || !settings.checkout) return;
-  const code = dNumber === 50 ? 'Bull' : 'D' + dNumber;
-  const words = checkoutCallWords(dNumber === 50 ? 50 : dNumber * 2, settings.lang, forMatch ? 'match' : 'plain', false);
-  enqueue([{ urls: clipCandidates('double', code, forMatch ? 'match' : null), text: words || `Double ${dNumber}`, gapBeforeMs: 250, prio: 0 }]);
-}
+// KAY 02.12.: callDoubleRequired ENTFERNT ("You require double..." raus, kein Gebrabbel).
 
 export function callGameShot(legsWonMe = 0, legsWonOpp = 0, matchOver = false) {
   if (!settings.enabled) return;

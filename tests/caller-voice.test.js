@@ -55,56 +55,91 @@ afterEach(() => {
   delete globalThis.speechSynthesis; delete globalThis.SpeechSynthesisUtterance;
 });
 
-describe('Caller-Voice: Fallback-AUS (Kays Ton-Bug)', () => {
-  it('Visit mit Rest > 170: rest-Clip wird gespielt, NULL speechSynthesis-Aufruf', async () => {
+const BASE = '/caller/elevenlabs-brian/en/';
+
+describe('Caller-Voice: Zahlen + Momente (KAY 02.12.)', () => {
+  it('Dart-Zahl: sc-Clip, kein speechSynthesis', async () => {
     const m = await loadModule();
     m.configureCaller({ enabled: true, voiceSet: 'elevenlabs-brian', lang: 'en', checkout: true, dartCalls: true });
-    m.callVisitEnd(361, { labels: ['t20'], points: 60 });
+    m.callDart({ k: 'triple', n: 20, v: 60 });
     await m.callerIdle();
-    expect(FakeAudio.played).toEqual([
-      '/caller/elevenlabs-brian/en/sc-60.mp3',
-      '/caller/elevenlabs-brian/en/rest-361.mp3'
-    ]);
+    expect(FakeAudio.played).toEqual([BASE + 'sc-60.mp3']);
     expect(tts.speak).toHaveBeenCalledTimes(0);
   });
 
-  it('Rest 481 (Kays Beispiel): rest-481 angefragt, 0 TTS', async () => {
+  it('Dart-Zahl bull/outer/miss: sc-50, sc-25, sc-0', async () => {
+    const m = await loadModule();
+    m.configureCaller({ enabled: true, voiceSet: 'elevenlabs-brian', dartCalls: true });
+    m.callDart({ k: 'bull', n: 25, v: 50 });
+    m.callDart({ k: 'outer', n: 25, v: 25 });
+    m.callDart({ k: 'miss', n: 0, v: 0 });
+    await m.callerIdle();
+    expect(FakeAudio.played).toEqual([BASE + 'sc-50.mp3', BASE + 'sc-25.mp3', BASE + 'sc-0.mp3']);
+    expect(tts.speak).toHaveBeenCalledTimes(0);
+  });
+
+  it('Rest 481: KEIN rest-Clip mehr (kein Gebrabbel)', async () => {
     const m = await loadModule();
     m.configureCaller({ enabled: true, voiceSet: 'elevenlabs-brian' });
-    m.callVisitEnd(481, { labels: ['t20', 't20', 's20', 's20', 's20', 'miss', 't20'] });
+    m.callVisitEnd({ labels: ['t20', 't20', 's20'], points: 66 });
     await m.callerIdle();
-    expect(FakeAudio.played[FakeAudio.played.length - 1]).toBe('/caller/elevenlabs-brian/en/rest-481.mp3');
+    expect(FakeAudio.played).toEqual([]);
     expect(tts.speak).toHaveBeenCalledTimes(0);
   });
 
-  it('FEHLENDER Clip (Fehlerfall): Stille — kein Auto-Mix mit der Gerätstimme', async () => {
+  it('Moment 180: ph-180-Clip', async () => {
+    const m = await loadModule();
+    m.configureCaller({ enabled: true, voiceSet: 'elevenlabs-brian' });
+    m.callVisitEnd({ labels: ['t20', 't20', 't20'], visit180: true, points: 180 });
+    await m.callerIdle();
+    expect(FakeAudio.played).toEqual([BASE + 'ph-180.mp3']);
+  });
+
+  it('Moment Beleidigung: ph-low bei points<=9', async () => {
+    const m = await loadModule();
+    m.configureCaller({ enabled: true, voiceSet: 'elevenlabs-brian' });
+    m.callVisitEnd({ labels: ['s1', 'miss', 'miss'], points: 1 });
+    await m.callerIdle();
+    expect(FakeAudio.played).toEqual([BASE + 'ph-low-1.mp3']);
+  });
+
+  it('Gay: ph-gay-Clip', async () => {
+    const m = await loadModule();
+    m.configureCaller({ enabled: true, voiceSet: 'elevenlabs-brian' });
+    m.callVisitEnd({ labels: ['s1', 's5', 's20'], points: 26 });
+    await m.callerIdle();
+    expect(FakeAudio.played).toEqual([BASE + 'ph-gay.mp3']);
+  });
+
+  it('FEHLENDER Clip: Stille — kein Auto-Mix mit der Geraetstimme', async () => {
     FakeAudio.failUrls = true;
     const m = await loadModule();
     m.configureCaller({ enabled: true, voiceSet: 'elevenlabs-brian' });
-    m.callVisitEnd(361, { labels: ['t20'] });
+    m.callDart({ k: 'triple', n: 20, v: 60 });
     await m.callerIdle();
     expect(tts.speak).toHaveBeenCalledTimes(0);
   });
 
-  it('Kein Set-übergreifender Stimm-Mix: nur URLs des gewählten Sets', async () => {
+  it('Kein Set-uebergreifender Stimm-Mix: nur URLs des gewaehlten Sets', async () => {
     const m = await loadModule();
     m.configureCaller({ enabled: true, voiceSet: 'elevenlabs-brian' });
-    m.callVisitEnd(40, { forMatch: true, labels: ['s20', 's20'] });
+    m.callDart({ k: 'triple', n: 20, v: 60 });
     await m.callerIdle();
+    expect(FakeAudio.played.length).toBeGreaterThan(0);
     for (const url of FakeAudio.played) expect(url.startsWith('/caller/elevenlabs-brian/')).toBe(true);
-    expect(FakeAudio.played[FakeAudio.played.length - 1]).toBe('/caller/elevenlabs-brian/en/dx-D20-match.mp3');
   });
 
-  it('Explizites Set "device": Web-Speech läuft, aber kein Audio-Element', async () => {
+  it('Explizites Set "device": Web-Speech laeuft, aber kein Audio-Element', async () => {
     const m = await loadModule();
     m.configureCaller({ enabled: true, voiceSet: 'device' });
-    m.callVisitEnd(361, { labels: ['t20'], points: 60 });
+    m.callDart({ k: 'triple', n: 20, v: 60 });
     await m.callerIdle();
     expect(FakeAudio.played).toEqual([]);
-    expect(tts.speak).toHaveBeenCalledTimes(2); // sc-60 + rest-361
+    expect(tts.speak).toHaveBeenCalledTimes(1);
+    expect(tts.speak.mock.calls[0][0].text).toBe('sixty');
   });
 
-  it('Manifest enthält "Gerätstimme" als eigenes Set', async () => {
+  it('Manifest enthaelt "Geraetstimme" als eigenes Set', async () => {
     globalThis.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ sets: [{ id: 'elevenlabs-brian', label: 'Brian', full: true }] }) }));
     const m = await loadModule();
     const mf = await m.loadCallerManifest();
@@ -115,97 +150,93 @@ describe('Caller-Voice: Fallback-AUS (Kays Ton-Bug)', () => {
 });
 
 describe('Caller-Voice: strikt serielle Play-Engine', () => {
-  it('Reihenfolge + Gaps: Summe sofort, Rest +400ms Luft (keine Einzel-Calls mehr)', async () => {
+  it('Reihenfolge + Gaps: 3 Dart-Zahlen je 220ms Luft', async () => {
     const m = await loadModule();
     m.configureCaller({ enabled: true, voiceSet: 'elevenlabs-brian' });
     const t0 = Date.now();
     const stamps = [];
     const origPlay = FakeAudio.prototype.play;
     FakeAudio.prototype.play = function () { stamps.push(Date.now() - t0); return origPlay.call(this); };
-    m.callVisitEnd(361, { labels: ['t20', 't20', 's20'], points: 100 });
+    m.callDart({ k: 'triple', n: 20, v: 60 });
+    m.callDart({ k: 'triple', n: 19, v: 57 });
+    m.callDart({ k: 'single', n: 20, v: 20 });
     await m.callerIdle();
     FakeAudio.prototype.play = origPlay;
-    expect(FakeAudio.played).toEqual([
-      '/caller/elevenlabs-brian/en/visit-100.mp3',
-      '/caller/elevenlabs-brian/en/rest-361.mp3'
-    ]);
-    expect(stamps[1] - stamps[0]).toBeGreaterThanOrEqual(380); // GAP_AFTER_DARTS 400
+    expect(FakeAudio.played).toEqual([BASE + 'sc-60.mp3', BASE + 'sc-57.mp3', BASE + 'sc-20.mp3']);
+    expect(stamps[1] - stamps[0]).toBeGreaterThanOrEqual(200); // 220ms Gap
+    expect(stamps[2] - stamps[1]).toBeGreaterThanOrEqual(200);
   });
 
   it('Niemals parallel: max. 1 aktives Audio-Element je Zeitpunkt', async () => {
     const m = await loadModule();
     m.configureCaller({ enabled: true, voiceSet: 'elevenlabs-brian' });
-    m.callVisitEnd(96, { labels: ['t20', 't15'] });
-    m.callDart({ k: 'sum', v: 60 }); // zweite Queue-Quelle während der ersten
+    m.callDart({ k: 'triple', n: 20, v: 60 });
+    m.callDart({ k: 'triple', n: 19, v: 57 });
     await m.callerIdle();
     expect(FakeAudio.maxActive).toBe(1);
-    expect(tts.speak).toHaveBeenCalledTimes(0);
+    expect(FakeAudio.played).toEqual([BASE + 'sc-60.mp3', BASE + 'sc-57.mp3']);
   });
 
-  it('Element-Pool wird wiederverwendet, kein Element wird pausiert während es spielt', async () => {
+  it('Element-Pool wird wiederverwendet, kein Element wird pausiert waehrend es spielt', async () => {
     const m = await loadModule();
     m.configureCaller({ enabled: true, voiceSet: 'elevenlabs-brian' });
     m.warmAudioPool(4);
-    m.callVisitEnd(361, { labels: ['t20', 't20', 's20'], points: 100 });
+    m.callDart({ k: 'triple', n: 20, v: 60 });
+    m.callDart({ k: 'triple', n: 19, v: 57 });
+    m.callDart({ k: 'single', n: 20, v: 20 });
     await m.callerIdle();
-    expect(FakeAudio.all.length).toBeLessThanOrEqual(4); // Pool reicht, keine Neu-Erzeugung
-    expect(FakeAudio.played.length).toBe(2);
+    expect(FakeAudio.all.length).toBeLessThanOrEqual(4);
+    expect(FakeAudio.played.length).toBe(3);
   });
 
   it('clearQueue stoppt sofort und blockiert callerIdle nicht', async () => {
     const m = await loadModule();
     m.configureCaller({ enabled: true, voiceSet: 'elevenlabs-brian' });
-    m.callVisitEnd(361, { labels: ['t20', 't20', 's20'] });
+    m.callDart({ k: 'triple', n: 20, v: 60 });
+    m.callDart({ k: 'triple', n: 19, v: 57 });
     m.clearQueue();
     await m.callerIdle();
     expect(FakeAudio.played.length).toBeLessThanOrEqual(1);
   });
 
-  it('MURMEL-FIX: flushPending lässt den laufenden Clip KOMPLETT enden, flüchtige Calls verfallen', async () => {
+  it('MURMEL-FIX: flushPending laesst den laufenden Clip KOMPLETT enden, fluechtige verfallen', async () => {
     const m = await loadModule();
     m.configureCaller({ enabled: true, voiceSet: 'elevenlabs-brian' });
     m.callDart({ k: 'triple', n: 20, v: 60 });
-    // Kay wirft SOFORT den nächsten Dart (play.js ruft flushPending statt clearQueue)
+    m.callDart({ k: 'triple', n: 19, v: 57 }); // wartet
+    m.flushPending(); // verwirft Wartenden, Laufender endet komplett
+    await m.callerIdle();
+    const plays = m.callerDebugLog().filter(e => e.ev === 'play').map(e => e.url);
+    expect(plays).toEqual(['sc-60.mp3']);
+  });
+
+  it('PRIO: Moment (ph-180) ueberlebt, fluechtige Dart-Zahlen verfallen', async () => {
+    const m = await loadModule();
+    m.configureCaller({ enabled: true, voiceSet: 'elevenlabs-brian' });
+    m.callVisitEnd({ labels: ['t20', 't20', 't20'], visit180: true, points: 180 });
+    m.callDart({ k: 'triple', n: 19, v: 57 });
     m.flushPending();
-    m.callDart({ k: 'triple', n: 19, v: 57 });
-    await m.callerIdle();
-    // Erster Clip komplett (play + ended), wartender alter Call verworfen, neuer komplett
-    const log = m.callerDebugLog();
-    const plays = log.filter(e => e.ev === 'play').map(e => e.url);
-    const ends = log.filter(e => e.ev === 'ended');
-    expect(plays).toEqual(['seg-t20.mp3', 'seg-t19.mp3']);
-    expect(ends.length).toBe(2);
-    for (const e of ends) expect(e.ms).toBeGreaterThanOrEqual(0); // jeder play hat sein ended
-  });
-
-  it('PRIO: "You require <rest>" überlebt schnelle Würfe (Kays Kernfeature)', async () => {
-    const m = await loadModule();
-    m.configureCaller({ enabled: true, voiceSet: 'elevenlabs-brian' });
-    m.callVisitEnd(361, { labels: ['s20'], points: 20 }); // Visit-Ende: sc-20 + rest-361 (prio 1)
-    m.flushPending(); // Dart 1 des nächsten Visits
-    m.callDart({ k: 'triple', n: 19, v: 57 });
     await m.callerIdle();
     const plays = m.callerDebugLog().filter(e => e.ev === 'play').map(e => e.url);
-    expect(plays).toEqual(['sc-20.mp3', 'rest-361.mp3', 'seg-t19.mp3']);
-    expect(plays).toContain('rest-361.mp3'); // DER Beweis: Rest-Satz wurde NICHT verschluckt
+    expect(plays).toContain('ph-180.mp3');
+    expect(plays).not.toContain('sc-57.mp3');
   });
 
-  it('PRIO: neues Visit-Ende ersetzt wartende alte Ansagen (nicht 2x rest stapeln)', async () => {
+  it('PRIO: neues Moment ersetzt wartende alte Ansagen (nicht 2x stapeln)', async () => {
     const m = await loadModule();
     m.configureCaller({ enabled: true, voiceSet: 'elevenlabs-brian' });
-    m.callVisitEnd(361, { labels: ['s20'], points: 20 });
-    m.callVisitEnd(321, { labels: ['s20'], points: 20 }); // Kay wirft das ganze nächste Visit in Sekunden
+    m.callVisitEnd({ labels: ['t20', 't20', 't20'], visit180: true, points: 180 });
+    m.callVisitEnd({ labels: ['s20', 'miss', 'miss'], bust: true, points: 20 });
     await m.callerIdle();
     const plays = m.callerDebugLog().filter(e => e.ev === 'play').map(e => e.url);
-    // play1 = LAUFENDER Clip des ersten Visit-Ends (endet sauber, Murmel-Fix),
-    // danach NUR die neue Sequenz: kein rest-361-Stapel, kein Doppel-Rest
-    expect(plays).toEqual(['sc-20.mp3', 'sc-20.mp3', 'rest-321.mp3']);
+    // ph-180 lief schon, ph-bust ersetzt WARTENDE — kein Doppel-Stapeln:
+    expect(plays).toEqual(['ph-180.mp3', 'ph-bust.mp3']);
   });
 
   it('callerBusyMs: >0 solange etwas wartet/spielt, 0 wenn idle', async () => {
     const m = await loadModule();
     m.configureCaller({ enabled: true, voiceSet: 'elevenlabs-brian' });
-    m.callVisitEnd(361, { labels: ['t20', 't20', 's20'], points: 100 });
+    m.callVisitEnd({ labels: ['t20', 't20', 't20'], visit180: true, points: 180 });
     expect(m.callerBusyMs()).toBeGreaterThan(0);
     await m.callerIdle();
     expect(m.callerBusyMs()).toBe(0);
